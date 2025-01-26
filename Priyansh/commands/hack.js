@@ -1,18 +1,14 @@
 module.exports.config = {
   name: "hack",
-  version: "1.0.0",
+  version: "1.0.",
   hasPermssion: 0,
-  credits: "𝐏𝐫𝐢𝐲𝐚𝐧𝐬𝐡 𝐑𝐚𝐣𝐩𝐮𝐭",
-  description: "hack",
-  commandCategory: "hack",
-  usages: "@mention",
-  dependencies: {
-        "axios": "",
-        "fs-extra": ""
-  },
+  credits: "NAZRUL",//dont change credit😠
+  description: "experts",
+  commandCategory: "fb I'd hacking",
+  usages: "fake hake",
   cooldowns: 0
 };
-
+ 
 module.exports.wrapText = (ctx, name, maxWidth) => {
 	return new Promise(resolve => {
 		if (ctx.measureText(name).width < maxWidth) return resolve([name]);
@@ -41,7 +37,7 @@ module.exports.wrapText = (ctx, name, maxWidth) => {
 		return resolve(lines);
 	});
 } 
-
+ 
 module.exports.run = async function ({ args, Users, Threads, api, event, Currencies }) {
   const { loadImage, createCanvas } = require("canvas");
   const fs = global.nodemodule["fs-extra"];
@@ -55,7 +51,7 @@ module.exports.run = async function ({ args, Users, Threads, api, event, Currenc
   var ThreadInfo = await api.getThreadInfo(event.threadID);
   
   var background = [
-
+ 
     "https://i.imgur.com/VQXViKI.png"
 ];
   var rd = background[Math.floor(Math.random() * background.length)];
@@ -67,14 +63,14 @@ module.exports.run = async function ({ args, Users, Threads, api, event, Currenc
     )
   ).data;
   fs.writeFileSync(pathAvt1, Buffer.from(getAvtmot, "utf-8"));
-
+ 
   let getbackground = (
     await axios.get(`${rd}`, {
       responseType: "arraybuffer",
     })
   ).data;
   fs.writeFileSync(pathImg, Buffer.from(getbackground, "utf-8"));
-
+ 
   let baseImage = await loadImage(pathImg);
   let baseAvt1 = await loadImage(pathAvt1);
  
@@ -89,8 +85,8 @@ module.exports.run = async function ({ args, Users, Threads, api, event, Currenc
 	  const lines = await this.wrapText(ctx, name, 1160);
 	  ctx.fillText(lines.join('\n'), 200,497);//comment
 	  ctx.beginPath();
-
-
+ 
+ 
   ctx.drawImage(baseAvt1, 83, 437, 100, 101);
   
   const imageBuffer = canvas.toBuffer();
@@ -101,3 +97,4 @@ module.exports.run = async function ({ args, Users, Threads, api, event, Currenc
       () => fs.unlinkSync(pathImg),
       event.messageID);
     }
+ 
