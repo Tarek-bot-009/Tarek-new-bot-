@@ -1,45 +1,39 @@
-module.exports = {
-  config: {
-    name: "bby",
-    aliases: [],
-    version: "1.0",
-    author: "Tarek",
-    role: 0,
-    shortDescription: "Cute bot reply",
-    longDescription: "Responds to common cute phrases",
-    category: "fun",
-    guide: {
-      en: "/bby ki koro",
-    },
-  },
 
-  onStart: async function ({ message, event, args }) {
-    const input = args.join(" ").toLowerCase();
+module.exports.config = {
+  name: "bby",
+  version: "1.0.0",
+  permission: 0,
+  credits: "Tarek",
+  description: "Bengali chatbot command",
+  prefix: true,
+  category: "chat",
+  usages: "[question]",
+  cooldowns: 5
+};
 
-    const answers = {
-      "তোমার নাম কি": "আমার নাম বেবি! Dummy boy বানাইছে।",
-      "তুমি কে": "আমি একটা স্মার্ট বট, মনে রাখবা!",
-      "তুমি কেমন আছো": "ভালো আছি, তুমি কেমন?",
-      "তুমি কি আমাকে ভালোবাসো": "হ্যাঁ, অবশ্যই!",
-      "ki koro": "তোমার সাথেই তো কথা বলি!",
-      "baby ki koro": "তোমার কথাই ভাবি...",
-      "bby ki koro": "তোমার মেসেজের অপেক্ষায় আছি!",
-    };
+module.exports.run = async ({ api, event, args }) => {
+  const input = args.join(" ");
 
-    for (let question in answers) {
-      if (input.includes(question)) {
-        return message.reply(answers[question]);
-      }
+  const answers = {
+    "à¦¤à§‹à¦®à¦¾à¦° à¦¨à¦¾à¦® à¦•à¦¿": "à¦†à¦®à¦¾à¦° à¦¨à¦¾à¦® à¦¬à§‡à¦¬à¦¿! à¦¡à§‡à¦­à§‡à¦²à¦ªà¦¾à¦° à¦†à¦®à¦¾à¦•à§‡ à¦…à¦¨à§‡à¦• à¦­à¦¾à¦²à§‹à¦¬à¦¾à¦¸à§‡!",
+    "à¦¤à§à¦®à¦¿ à¦•à§‡": "à¦†à¦®à¦¿ à¦à¦•à¦Ÿà¦¾ à¦¸à§à¦®à¦¾à¦°à§à¦Ÿ à¦¬à¦Ÿ, à¦®à¦¨à§‡ à¦°à¦¾à¦–à¦¤à§‡ à¦ªà¦¾à¦°à§‹!",
+    "à¦¤à§à¦®à¦¿ à¦•à§‡à¦®à¦¨ à¦†à¦›à§‹": "à¦­à¦¾à¦²à§‹ à¦†à¦›à¦¿, à¦¤à§à¦®à¦¿ à¦•à§‡à¦®à¦¨ à¦†à¦›à§‹?",
+    "à¦¤à§à¦®à¦¿ à¦•à¦¿ à¦†à¦®à¦¾à¦•à§‡ à¦­à¦¾à¦²à§‹à¦¬à¦¾à¦¸à§‹": "à¦¹à§à¦¯à¦¾à¦, à¦…à¦¨à§‡à¦• à¦­à¦¾à¦²à§‹à¦¬à¦¾à¦¸à¦¿!"
+  };
+
+  const randomReplies = [
+    "à¦­à¦¾à¦²à§‹ à¦ªà§à¦°à¦¶à§à¦¨! à¦•à¦¿à¦¨à§à¦¤à§ à¦‰à¦¤à§à¦¤à¦°à¦Ÿà¦¾ à¦ªà¦°à§‡ à¦¬à¦²à¦¿",
+    "à¦†à¦®à¦¿ à¦à¦•à¦Ÿà§ à¦šà¦¿à¦¨à§à¦¤à¦¾ à¦•à¦°à§‡ à¦¬à¦²à¦¿, à¦¦à¦¾à¦à¦¡à¦¼à¦¾à¦“...",
+    "à¦à¦‡ à¦ªà§à¦°à¦¶à§à¦¨ à¦¶à§à¦¨à§‡à¦‡ à¦¤à§‹ à¦†à¦®à¦¿ à¦˜à§‡à¦®à§‡ à¦—à§‡à¦›à¦¿!",
+    "à¦¤à§à¦®à¦¿ à¦–à§à¦¬ à¦•à¦¿à¦‰à¦Ÿ, à¦¤à¦¾à¦‡ à¦•à¦¿à¦›à§ à¦¬à¦²à¦¤à§‡ à¦­à¦¯à¦¼ à¦²à¦¾à¦—à§‡..."
+  ];
+
+  for (let question in answers) {
+    if (input.includes(question)) {
+      return api.sendMessage(answers[question], event.threadID, event.messageID);
     }
+  }
 
-    const randomReplies = [
-      "ভালো প্রশ্ন! কিন্তু উত্তরটা পরে বলি",
-      "আমি একটু চিন্তা করে বলি, দাঁড়াও...",
-      "এই প্রশ্ন শুনেই তো আমি ঘেমে গেছি!",
-      "তুমি খুব কিউট, তাই কিছু বলতে ভয় পাচ্ছি",
-    ];
-
-    const randomIndex = Math.floor(Math.random() * randomReplies.length);
-    return message.reply(randomReplies[randomIndex]);
-  },
+  const randomIndex = Math.floor(Math.random() * randomReplies.length);
+  return api.sendMessage(randomReplies[randomIndex], event.threadID, event.messageID);
 };
