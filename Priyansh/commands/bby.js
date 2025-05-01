@@ -7,31 +7,33 @@ module.exports = {
     name: "bby",
     version: "1.0",
     author: "Tarek + ChatGPT",
-    countDown: 0,
     role: 0,
-    shortDescription: "রোমান্টিক বাংলা উত্তর",
-    longDescription: "প্রশ্ন করলে বাংলা ভাষায় আবেগপূর্ণ উত্তর দিবে",
+    shortDescription: "রোমান্টিক বাংলা বট",
+    longDescription: "প্রশ্ন করলেই বাংলা ভাষায় আবেগপূর্ণ বেবি উত্তর দিবে",
     category: "ai",
   },
 
-  onStart: async function ({ api, event }) {
-    const { threadID, messageID, senderID, body } = event;
-    const lowerBody = body.toLowerCase();
+  onChat: async ({ event, api }) => {
+    const { body, senderID, threadID, messageID } = event;
+    const lowerText = body?.toLowerCase() || "";
 
-    // প্রথমে trigger হয় কিনা
-    if (lowerBody.startsWith("bby") || lowerBody.startsWith("baby") || lowerBody.startsWith("beby")) {
+    // Trigger keywords
+    const triggerWords = ["bby", "baby", "beby"];
+
+    // প্রথমবার ট্রিগার হলে active করে রাখবে
+    if (triggerWords.some(word => lowerText.startsWith(word))) {
       activeUsers.add(senderID);
-      return api.sendMessage("হ্যাঁ জানু বলো, আমি শুনছি...", threadID, messageID);
+      return api.sendMessage("আচ্ছা বেবি! এখন থেকে আমি তোমার কথা শুনবো শুধু বাংলায়, বলো...", threadID, messageID);
     }
 
-    // active হলে উত্তর দিবে
+    // active হলে বাংলা উত্তর দিবে
     if (activeUsers.has(senderID)) {
       try {
         const res = await axios.get(`https://www.noobs-api.rf.gd/dipto?ask=${encodeURIComponent(body)}`);
         const reply = res.data.reply;
         return api.sendMessage(reply, threadID, messageID);
-      } catch (e) {
-        return api.sendMessage("ওফ! একটু সমস্যা হচ্ছে জানু, পরে বলো প্লিজ...", threadID, messageID);
+      } catch (err) {
+        return api.sendMessage("উফ! একটু সমস্যা হচ্ছে, একটু পরে বলো প্লিজ...", threadID, messageID);
       }
     }
   }
