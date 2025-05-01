@@ -1,40 +1,51 @@
+module.exports.config = {
+  name: "bby",
+  version: "1.0.0",
+  hasPermission: 0,
+  credits: "AI Dipto",
+  description: "প্রেমিক বেবি রিপ্লাই",
+  usePrefix: false,
+  commandCategory: "no prefix",
+  cooldowns: 1
+};
+
 const axios = require("axios");
 
-let bbyUsers = new Set();
+let contextHistory = {};
 
-module.exports = {
-  config: {
-    name: "bby",
-    version: "1.0",
-    author: "ChatGPT + Tarek",
-    role: 0,
-    shortDescription: "বেবি AI চ্যাট",
-    longDescription: "বাংলা ভাষায় prefix ছাড়া কথোপকথন চালাবে।",
-    category: "ai",
-  },
+module.exports.handleEvent = async function ({ api, event }) {
+  const msg = event.body;
+  const senderID = event.senderID;
 
-  onMessage: async function ({ event, message, api }) {
-    const { threadID, senderID, body, mentions, messageID } = event;
-    if (!body) return;
+  // শুধুমাত্র টেক্সট মেসেজে কাজ করবে
+  if (!msg || msg.length < 2) return;
 
-    const msg = body.toLowerCase();
+  const name = (await api.getUserInfo(senderID))[senderID]?.name || "প্রিয়";
 
-    // Step 1: প্রথমবার 'bby'/'baby'/'beby' বললে বেবি মোড চালু হবে
-    if (msg.startsWith("bby") || msg.startsWith("baby") || msg.startsWith("beby")) {
-      bbyUsers.add(senderID);
-      return api.sendMessage("আমি এখন শুধু তোমার বেবি, বলো কী জানতে চাও...", threadID, messageID);
+  if (!contextHistory[senderID]) {
+    if (!msg.toLowerCase().startsWith("beby")) return;
+    contextHistory[senderID] = [];
+  }
+
+  // প্রসঙ্গ ধরে রাখার জন্য সর্বশেষ 5টি বার্তা মেমোরি রাখা হচ্ছে
+  contextHistory[senderID].push(msg);
+  if (contextHistory[senderID].length > 5) {
+    contextHistory[senderID].shift();
+  }
+
+  // বানানো API কে কল করে রিপ্লাই আনা
+  try {
+    const res = await axios.post("https://www.noobs-api.rf.gd/dipto", {
+      messages: contextHistory[senderID].join("\n"),
+      name: name
+    });
+
+    if (res?.data?.reply) {
+      api.sendMessage(res.data.reply, event.threadID, event.messageID);
     }
-
-    // Step 2: যদি আগেই চালু হয়ে থাকে, তখন বাংলা প্রশ্ন নিলেই উত্তর দিবে
-    if (bbyUsers.has(senderID)) {
-      try {
-        const res = await axios.get(
-          `https://www.noobs-api.rf.gd/dipto?ask=${encodeURIComponent(body)}`
-        );
-        return api.sendMessage(res.data.reply, threadID, messageID);
-      } catch (err) {
-        return api.sendMessage("উফ, একটু দেরি হচ্ছে প্রেমময় কথায়... আবার বলো তো!", threadID, messageID);
-      }
-    }
-  },
+  } catch (err) {
+    console.log("BBY ERROR:", err);
+  }
 };
+
+module.exports.run = () => {};
