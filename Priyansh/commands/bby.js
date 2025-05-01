@@ -1,40 +1,40 @@
 const axios = require("axios");
 
-let activeUsers = new Set();
+let bbyUsers = new Set();
 
 module.exports = {
   config: {
     name: "bby",
-    version: "2.0",
-    author: "Tarek + ChatGPT",
+    version: "1.0",
+    author: "ChatGPT + Tarek",
     role: 0,
-    shortDescription: "বাংলা AI বেবি",
-    longDescription: "prefix ছাড়া বাংলা ভাষায় প্রশ্নের উত্তর দিবে",
-    category: "ai"
+    shortDescription: "বেবি AI চ্যাট",
+    longDescription: "বাংলা ভাষায় prefix ছাড়া কথোপকথন চালাবে।",
+    category: "ai",
   },
 
-  onMessage: async ({ event, api }) => {
-    const { senderID, threadID, messageID, body } = event;
+  onMessage: async function ({ event, message, api }) {
+    const { threadID, senderID, body, mentions, messageID } = event;
     if (!body) return;
 
-    const lower = body.toLowerCase();
-    const triggers = ["bby", "baby", "beby"];
+    const msg = body.toLowerCase();
 
-    // বেবি মোড অন করে
-    if (triggers.some(word => lower.startsWith(word))) {
-      activeUsers.add(senderID);
-      return api.sendMessage("হুম বেবি, আমি এখন তোমার! বাংলায় জিজ্ঞেস করো যা ইচ্ছা...", threadID, messageID);
+    // Step 1: প্রথমবার 'bby'/'baby'/'beby' বললে বেবি মোড চালু হবে
+    if (msg.startsWith("bby") || msg.startsWith("baby") || msg.startsWith("beby")) {
+      bbyUsers.add(senderID);
+      return api.sendMessage("আমি এখন শুধু তোমার বেবি, বলো কী জানতে চাও...", threadID, messageID);
     }
 
-    // বেবি মোডে থাকলে উত্তর দিবে
-    if (activeUsers.has(senderID)) {
+    // Step 2: যদি আগেই চালু হয়ে থাকে, তখন বাংলা প্রশ্ন নিলেই উত্তর দিবে
+    if (bbyUsers.has(senderID)) {
       try {
-        const res = await axios.get(`https://www.noobs-api.rf.gd/dipto?ask=${encodeURIComponent(body)}`);
-        const reply = res.data.reply;
-        return api.sendMessage(reply, threadID, messageID);
+        const res = await axios.get(
+          `https://www.noobs-api.rf.gd/dipto?ask=${encodeURIComponent(body)}`
+        );
+        return api.sendMessage(res.data.reply, threadID, messageID);
       } catch (err) {
-        return api.sendMessage("উফ বেবি, নেটটা একটু স্লো লাগছে... আবার বলো তো!", threadID, messageID);
+        return api.sendMessage("উফ, একটু দেরি হচ্ছে প্রেমময় কথায়... আবার বলো তো!", threadID, messageID);
       }
     }
-  }
+  },
 };
