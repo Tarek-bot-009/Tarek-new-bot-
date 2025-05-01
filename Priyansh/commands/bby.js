@@ -1,38 +1,38 @@
-module.exports.config = {
-  name: "bby",
-  version: "1.0.0",
-  hasPermission: 0,
-  credits: "Tarek & ChatGPT",
-  description: "Bangla smart reply",
-  commandCategory: "fun",
-  usages: "[question]",
-  cooldowns: 2,
-};
+const axios = require("axios");
 
-module.exports.run = async function ({ api, event, args }) {
-  const input = args.join(" ");
-  if (!input) return api.sendMessage("তুমি কী জানতে চাও?", event.threadID);
+let activeUsers = new Set();
 
-  const answers = {
-    "তোমার নাম কি": "আমার নাম বেবি! Daddy Tarek দিয়েছে",
-    "তুমি কে": "আমি একটা স্মার্ট বট, মনে রেখো!",
-    "তুমি কেমন আছো": "ভালো আছি, তুমি?",
-    "তুমি কি আমাকে ভালোবাসো": "হ্যাঁ, খুব ভালোবাসি!",
-  };
+module.exports = {
+  config: {
+    name: "bby",
+    version: "1.0",
+    author: "Tarek + ChatGPT",
+    countDown: 0,
+    role: 0,
+    shortDescription: "রোমান্টিক বাংলা উত্তর",
+    longDescription: "প্রশ্ন করলে বাংলা ভাষায় আবেগপূর্ণ উত্তর দিবে",
+    category: "ai",
+  },
 
-  for (let question in answers) {
-    if (input.toLowerCase().includes(question)) {
-      return api.sendMessage(answers[question], event.threadID, event.messageID);
+  onStart: async function ({ api, event }) {
+    const { threadID, messageID, senderID, body } = event;
+    const lowerBody = body.toLowerCase();
+
+    // প্রথমে trigger হয় কিনা
+    if (lowerBody.startsWith("bby") || lowerBody.startsWith("baby") || lowerBody.startsWith("beby")) {
+      activeUsers.add(senderID);
+      return api.sendMessage("হ্যাঁ জানু বলো, আমি শুনছি...", threadID, messageID);
+    }
+
+    // active হলে উত্তর দিবে
+    if (activeUsers.has(senderID)) {
+      try {
+        const res = await axios.get(`https://www.noobs-api.rf.gd/dipto?ask=${encodeURIComponent(body)}`);
+        const reply = res.data.reply;
+        return api.sendMessage(reply, threadID, messageID);
+      } catch (e) {
+        return api.sendMessage("ওফ! একটু সমস্যা হচ্ছে জানু, পরে বলো প্লিজ...", threadID, messageID);
+      }
     }
   }
-
-  const randomReplies = [
-    "ভালো প্রশ্ন! কিন্তু উত্তরটা পরে বলি",
-    "আমি একটু চিন্তা করে বলি, দাঁড়াও...",
-    "এই প্রশ্ন শুনেই তো আমি ঘেমে গেছি!",
-    "তুমি খুব কিউট, তাই কিছু বলতে ভয় পাচ্ছি...",
-  ];
-
-  const index = Math.floor(Math.random() * randomReplies.length);
-  return api.sendMessage(randomReplies[index], event.threadID, event.messageID);
 };
