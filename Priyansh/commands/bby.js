@@ -1,39 +1,38 @@
-
 module.exports.config = {
   name: "bby",
   version: "1.0.0",
-  permission: 0,
-  credits: "Tarek",
-  description: "Bengali chatbot command",
-  prefix: true,
-  category: "chat",
+  hasPermission: 0,
+  credits: "Tarek & ChatGPT",
+  description: "Bangla smart reply",
+  commandCategory: "fun",
   usages: "[question]",
-  cooldowns: 5
+  cooldowns: 2,
 };
 
-module.exports.run = async ({ api, event, args }) => {
+module.exports.run = async function ({ api, event, args }) {
   const input = args.join(" ");
+  if (!input) return api.sendMessage("তুমি কী জানতে চাও?", event.threadID);
 
   const answers = {
-    "à¦¤à§‹à¦®à¦¾à¦° à¦¨à¦¾à¦® à¦•à¦¿": "à¦†à¦®à¦¾à¦° à¦¨à¦¾à¦® à¦¬à§‡à¦¬à¦¿! à¦¡à§‡à¦­à§‡à¦²à¦ªà¦¾à¦° à¦†à¦®à¦¾à¦•à§‡ à¦…à¦¨à§‡à¦• à¦­à¦¾à¦²à§‹à¦¬à¦¾à¦¸à§‡!",
-    "à¦¤à§à¦®à¦¿ à¦•à§‡": "à¦†à¦®à¦¿ à¦à¦•à¦Ÿà¦¾ à¦¸à§à¦®à¦¾à¦°à§à¦Ÿ à¦¬à¦Ÿ, à¦®à¦¨à§‡ à¦°à¦¾à¦–à¦¤à§‡ à¦ªà¦¾à¦°à§‹!",
-    "à¦¤à§à¦®à¦¿ à¦•à§‡à¦®à¦¨ à¦†à¦›à§‹": "à¦­à¦¾à¦²à§‹ à¦†à¦›à¦¿, à¦¤à§à¦®à¦¿ à¦•à§‡à¦®à¦¨ à¦†à¦›à§‹?",
-    "à¦¤à§à¦®à¦¿ à¦•à¦¿ à¦†à¦®à¦¾à¦•à§‡ à¦­à¦¾à¦²à§‹à¦¬à¦¾à¦¸à§‹": "à¦¹à§à¦¯à¦¾à¦, à¦…à¦¨à§‡à¦• à¦­à¦¾à¦²à§‹à¦¬à¦¾à¦¸à¦¿!"
+    "তোমার নাম কি": "আমার নাম বেবি! Daddy Tarek দিয়েছে",
+    "তুমি কে": "আমি একটা স্মার্ট বট, মনে রেখো!",
+    "তুমি কেমন আছো": "ভালো আছি, তুমি?",
+    "তুমি কি আমাকে ভালোবাসো": "হ্যাঁ, খুব ভালোবাসি!",
   };
 
-  const randomReplies = [
-    "à¦­à¦¾à¦²à§‹ à¦ªà§à¦°à¦¶à§à¦¨! à¦•à¦¿à¦¨à§à¦¤à§ à¦‰à¦¤à§à¦¤à¦°à¦Ÿà¦¾ à¦ªà¦°à§‡ à¦¬à¦²à¦¿",
-    "à¦†à¦®à¦¿ à¦à¦•à¦Ÿà§ à¦šà¦¿à¦¨à§à¦¤à¦¾ à¦•à¦°à§‡ à¦¬à¦²à¦¿, à¦¦à¦¾à¦à¦¡à¦¼à¦¾à¦“...",
-    "à¦à¦‡ à¦ªà§à¦°à¦¶à§à¦¨ à¦¶à§à¦¨à§‡à¦‡ à¦¤à§‹ à¦†à¦®à¦¿ à¦˜à§‡à¦®à§‡ à¦—à§‡à¦›à¦¿!",
-    "à¦¤à§à¦®à¦¿ à¦–à§à¦¬ à¦•à¦¿à¦‰à¦Ÿ, à¦¤à¦¾à¦‡ à¦•à¦¿à¦›à§ à¦¬à¦²à¦¤à§‡ à¦­à¦¯à¦¼ à¦²à¦¾à¦—à§‡..."
-  ];
-
   for (let question in answers) {
-    if (input.includes(question)) {
+    if (input.toLowerCase().includes(question)) {
       return api.sendMessage(answers[question], event.threadID, event.messageID);
     }
   }
 
-  const randomIndex = Math.floor(Math.random() * randomReplies.length);
-  return api.sendMessage(randomReplies[randomIndex], event.threadID, event.messageID);
+  const randomReplies = [
+    "ভালো প্রশ্ন! কিন্তু উত্তরটা পরে বলি",
+    "আমি একটু চিন্তা করে বলি, দাঁড়াও...",
+    "এই প্রশ্ন শুনেই তো আমি ঘেমে গেছি!",
+    "তুমি খুব কিউট, তাই কিছু বলতে ভয় পাচ্ছি...",
+  ];
+
+  const index = Math.floor(Math.random() * randomReplies.length);
+  return api.sendMessage(randomReplies[index], event.threadID, event.messageID);
 };
