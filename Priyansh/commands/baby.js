@@ -108,4 +108,78 @@ module.exports.run = async function ({ api, event, args, Users }) {
  return api.sendMessage(`✅ Replies added ${re.data.message}`, event.threadID, event.messageID);
  }
 
- if (['amar name ki'
+ if (['amar name ki', 'amr nam ki', 'amar nam ki', 'amr name ki'].some(phrase => dipto.includes(phrase))) {
+ const response = await axios.get(`${link}?text=amar name ki&senderID=${uid}&key=intro`);
+ return api.sendMessage(response.data.reply, event.threadID, event.messageID);
+ }
+
+ const a = (await axios.get(`${link}?text=${dipto}&senderID=${uid}&font=1`)).data.reply;
+ return api.sendMessage(a, event.threadID,
+ (error, info) => {
+ global.client.handleReply.push({
+ name: this.config.name,
+ type: "reply",
+ messageID: info.messageID,
+ author: event.senderID,
+ lnk: a,
+ apiUrl: link
+ });
+ }, event.messageID);
+
+ } catch (e) {
+ console.error('Error in command execution:', e);
+ return api.sendMessage(`Error: ${e.message}`, event.threadID, event.messageID);
+ }
+};
+
+module.exports.handleReply = async function ({ api, event, handleReply }) {
+try{
+ if (event.type == "message_reply") {
+ const reply = event.body.toLowerCase();
+ if (isNaN(reply)) {
+ const b = (await axios.get(`${await baseApiUrl()}/baby?text=${encodeURIComponent(reply)}&senderID=${event.senderID}&font=1`)).data.reply;
+ await api.sendMessage(b, event.threadID, (error, info) => {
+ global.client.handleReply.push({
+ name: this.config.name,
+ type: "reply",
+ messageID: info.messageID,
+ author: event.senderID,
+ lnk: b
+ });
+ }, event.messageID,
+ )}}
+}catch(err){
+ return api.sendMessage(`Error: ${err.message}`, event.threadID, event.messageID);
+}};
+
+ 
+module.exports.handleEvent = async function ({ api, event }) {
+try{
+ const body = event.body ? event.body.toLowerCase() : ""
+ if(body.startsWith("baby") || body.startsWith("bby") || body.startsWith("janu")){
+ const arr = body.replace(/^\S+\s*/, "")
+ if(!arr) {
+ await api.sendMessage("Yes 😀, i am here ", event.threadID, (error, info) => {
+ global.client.handleReply.push({
+ name: this.config.name,
+ type: "reply",
+ messageID: info.messageID,
+ author: event.senderID
+ });
+ }, event.messageID,
+ )
+ }
+ const a = (await axios.get(`${await baseApiUrl()}/baby?text=${encodeURIComponent(arr)}&senderID=${event.senderID}&font=1`)).data.reply; 
+ await api.sendMessage(a, event.threadID, (error, info) => {
+ global.client.handleReply.push({
+ name: this.config.name,
+ type: "reply",
+ messageID: info.messageID,
+ author: event.senderID,
+ lnk: a
+ });
+ }, event.messageID,
+ )}
+}catch(err){
+ return api.sendMessage(`Error: ${err.message}`, event.threadID, event.messageID);
+}};
