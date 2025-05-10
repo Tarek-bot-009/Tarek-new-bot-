@@ -8,7 +8,7 @@ const link = [
 ];
  
 module.exports.config = {
-  name: "@Nusrat Nur",
+  name: "Nusrat",
   version: "1.0.0",
   hasPermssion: 0,
   credits: "nazrul",
@@ -26,7 +26,7 @@ module.exports.config = {
 module.exports.handleEvent = async ({ api, event, Threads }) => {
   const content = event.body ? event.body : '';
     const body = content.toLowerCase();
-  if (body.startsWith("@Nusrat Nur")) {
+  if (body.startsWith("Nusrat")) {
     const rahad = [
       "~বৃষ্টি নামলে শহর ভেজে, ভিজতে পারিনা আমি..! শরীর ভেজানো ভীষণ  সহজ মন ভেজানো দামী🥀🥀🌹"
     
