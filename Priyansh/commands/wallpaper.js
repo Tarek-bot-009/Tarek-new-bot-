@@ -5,13 +5,11 @@ const path = require("path");
 module.exports.config = {
   name: "Wallpaper",
   version: "1.0.0",
-  haspermission: 0,
-  credits: "000",
-  prefix: 'true',
+  hasPermission: 0,
+  credits: "Islamick Cyber Chat ",
   description: "ফোন ওয়ালপেপার",
-  useprefix: true,
-  commandcategory: "Tarek Sarkar",
   usages: "wallpaper [নাম]",
+  commandCategory: "user",
   cooldowns: 5
 };
 
@@ -89,4 +87,3 @@ module.exports.run = async ({ api, event, args }) => {
     api.sendMessage("An error occurred while fetching wallpapers.", event.threadID, event.messageID);
   }
 };
-
