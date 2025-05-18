@@ -40,7 +40,7 @@ module.exports.run = async function({ api, event }) {
   let callback = function () {
           api.sendMessage({
             body: `𝐒𝐏𝐀𝐘𝐒𝐇𝐄𝐀𝐋 𝐑𝐀𝐍𝐃𝐎𝐌 𝐌𝐈𝐗 
-${shaon2} 𝚃𝙾𝚃𝙰𝙻 𝚅𝙸𝙳𝙴𝙾:${count}...🎬\n\n｢𝐊𝐡𝐚𝐧 𝐑𝐚𝐡𝐮𝐥 𝐑𝐊｣`,
+${shaon2} 𝚃𝙾𝚃𝙰𝙻 𝚅𝙸𝙳𝙴𝙾:${count}...🎬\n\n｢𝚃𝚊𝚛𝚎𝚔 𝚂𝚊𝚛𝚔𝚊𝚛｣`,
             attachment: fs.createReadStream(__dirname + `/cache/Shaoon.mp4`)
           }, event.threadID, () => fs.unlinkSync(__dirname + `/cache/Shaoon.mp4`), event.messageID);
         };
