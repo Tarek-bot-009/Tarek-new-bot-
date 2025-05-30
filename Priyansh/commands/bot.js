@@ -96,7 +96,7 @@ module.exports.handleEvent = async function({ api, event, args, Threads, Users }
    };
 
   if ((event.body.toLowerCase() == "Nova") || (event.body.toLowerCase() == "nova")) {
-     return api.sendMessage("সাবধান এটা হলিউডের নায়িকা পাওয়ারি অন্য রকম অভিনয় করার জন্য সেরা রে..!😹🍊⛏️", threadID);
+     return api.sendMessage("সাবধান এটা হলিউডের নায়িকা পাওয়ারি অন্য রকম ঢং করার জন্য সেরা রে..!😹🍊⛏️", threadID);
    };
   
   if ((event.body.toLowerCase() == "arvi") || (event.body.toLowerCase() == "Arvi")) {
