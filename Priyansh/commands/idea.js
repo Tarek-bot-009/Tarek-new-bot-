@@ -1,5 +1,5 @@
 module.exports.config = {
-    name: "murgi",
+    name: "idea",
     version: "1.2.0",
     hasPermssion: 0,
     credits: "NAZRUL (enhanced safe version)",
