@@ -1,58 +1,59 @@
 module.exports.config = {
     name: "murgi",
-    version: "1.2.0",
+    version: "1.3.0",
     hasPermssion: 0,
-    credits: "NAZRUL",
-    description: "Long beautiful mention message system",
+    credits: "FIXED VERSION",
+    description: "long beautiful message system",
     commandCategory: "fun",
     usages: "@mention",
-    cooldowns: 5,
-    dependencies: {}
+    cooldowns: 5
 };
 
 module.exports.run = async function({ api, event }) {
 
     const mentions = event.mentions || {};
-    const uid = Object.keys(mentions)[0];
+    let uid = Object.keys(mentions)[0];
+
+    if (!uid && event.messageReply) {
+        uid = event.messageReply.senderID;
+    }
 
     if (!uid) {
         return api.sendMessage(
-            "👉 দয়া করে কাউকে @mention করে আবার চেষ্টা করুন 😊",
+            "👉 কাউকে @mention বা reply করে চেষ্টা করুন 😊",
             event.threadID,
             event.messageID
         );
     }
 
-    const name = mentions[uid];
+    const name = mentions[uid] || "friend";
 
     const msg =
 `🌸 হ্যালো ${name} 👋
 
-✨ আজ তোমাকে একটু বলতে চাই…
-তুমি শুধু একজন মানুষ না, তুমি অনেকের জন্য inspiration 💖
+✨ আজ তোমাকে কিছু সুন্দর কথা বলতে চাই…
 
-🌈 জীবনে সবসময় সবকিছু সহজ হয় না,
-কিন্তু কঠিন সময়ই মানুষকে শক্ত করে তোলে।
+💖 তুমি একজন অসাধারণ মানুষ, যদিও তুমি সেটা সবসময় অনুভব করো না।
 
-💫 ${name}, তুমি হয়তো অনেক সময় নিজেকে ছোট ভাবো,
-কিন্তু সত্যি বলতে—তোমার ভিতরে অনেক বড় সম্ভাবনা আছে।
+🌈 জীবন সবসময় সহজ না, কিন্তু প্রতিটা কষ্টই তোমাকে শক্তিশালী বানায়।
 
-🔥 তুমি চাইলে অসম্ভবকেও সম্ভব করতে পারো।
+🔥 তুমি চাইলে নিজের জীবন পুরো বদলে ফেলতে পারো—শুধু বিশ্বাস রাখতে হবে নিজের উপর।
 
-🌙 রাত যতই অন্ধকার হোক,
-ভোর কিন্তু আসবেই—এটা মনে রেখো।
+🌙 কখনো ভাববে না তুমি একা,
+কারণ তোমার ভিতরে এমন শক্তি আছে যা তুমি নিজেও জানো না।
 
-💖 তুমি একা না,
-তোমার হাসি, তোমার কথা, তোমার উপস্থিতি—সবই গুরুত্বপূর্ণ।
+💫 ${name}, তোমার হাসিটা অনেকের দিন সুন্দর করে দিতে পারে।
 
-🌟 কখনো হাল ছেড়ো না ${name},
-কারণ তুমি যেটা ভাবো তার চেয়েও বেশি শক্তিশালী তুমি।
+🌟 তুমি হেরে যাওয়ার জন্য না, তুমি জেতার জন্য তৈরি।
 
-💌 সবসময় নিজের উপর বিশ্বাস রাখো,
-কারণ পৃথিবী সেই মানুষকেই মনে রাখে যে কখনো থেমে যায় না।
+💌 নিজের স্বপ্নকে কখনো ছোট মনে করো না,
+একদিন সেটাই তোমাকে বড় জায়গায় নিয়ে যাবে।
 
-✨ শেষ কথা...
-তুমি ভালো থাকো, হাসিখুশি থাকো, আর নিজের স্বপ্ন পূরণ করো ❤️`;
+🌸 সবসময় মনে রেখো—
+তুমি গুরুত্বপূর্ণ, তুমি মূল্যবান, তুমি special ❤️
+
+✨ শেষ কথা:
+সবসময় হাসিখুশি থাকো, ভালো থাকো, আর নিজের উপর বিশ্বাস রাখো ${name} 😊`;
 
     return api.sendMessage(
         msg,
