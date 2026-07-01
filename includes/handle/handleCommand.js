@@ -11,6 +11,10 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     const { userBanned, threadBanned, threadInfo, threadData, commandBanned } = global.data;
     const { commands, cooldowns } = global.client;
     var { body, senderID, threadID, messageID } = event;
+    console.log("========== DEBUG ==========");
+console.log("BODY:", body);
+console.log("MENTIONS:", event.mentions);
+console.log("===========================");
     var senderID = String(senderID),
       threadID = String(threadID);
     const threadSetting = threadData.get(threadID) || {}
