@@ -229,5 +229,5 @@
     "help2": {
         "autoUnsend": true,
         "delayUnsend": 300
-    }
+    },"GEMINI_API_KEY": "তোমার_API_KEY"
 }
