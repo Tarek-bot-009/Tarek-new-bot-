@@ -1,15 +1,15 @@
+const axios = require("axios");
+const fs = require("fs-extra");
+
 module.exports.config = {
   name: "bossreply",
   version: "1.0.0",
   hasPermssion: 0,
   credits: "ChatGPT",
-  description: "Auto reply when someone mentions Tarek",
+  description: "Boss auto voice reply",
   commandCategory: "system",
-  usages: "",
   cooldowns: 5
 };
-
-const fs = require("fs");
 
 module.exports.handleEvent = async function ({ api, event }) {
   if (!event.body) return;
@@ -20,35 +20,40 @@ module.exports.handleEvent = async function ({ api, event }) {
     text.includes("তারেক") ||
     text.includes("তারেক সরকার") ||
     text.includes("tarek") ||
-    text.includes("tarek sorkar") ||
     text.includes("boss") ||
-    text.includes("বস") ||
-    Object.keys(event.mentions || {}).length > 0
+    text.includes("বস")
   ) {
+    try {
+      const speech = "আসসালামু আলাইকুম। আপনি আমার বস, তারেক সরকারকে ডাকছেন। দুঃখিত, তিনি এই মুহূর্তে গুরুত্বপূর্ণ কাজে ব্যস্ত আছেন। অনুগ্রহ করে আপনার প্রয়োজনীয় বার্তাটি লিখে পাঠিয়ে দিন। সময় পেলেই তিনি আপনার বার্তা দেখে দ্রুত উত্তর দেওয়ার চেষ্টা করবেন। অযথা বারবার মেনশন করার প্রয়োজন নেই। ধন্যবাদ।";
 
-    const msg = {
-      body: `🔔 𝗔𝘂𝘁𝗼 𝗥𝗲𝗽𝗹𝘆
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=bn&q=${encodeURIComponent(speech)}`;
 
-আসসালামু আলাইকুম।
+      const file = __dirname + "/cache/boss.mp3";
 
-আপনি আমার বস ❤️ তারেক সরকার ❤️ কে ডাকছেন।
+      const res = await axios({
+        url,
+        method: "GET",
+        responseType: "stream"
+      });
 
-❌ দুঃখিত, তিনি বর্তমানে গুরুত্বপূর্ণ কাজে ব্যস্ত আছেন।
+      const writer = fs.createWriteStream(file);
+      res.data.pipe(writer);
 
-📝 আপনার প্রয়োজনীয় বার্তাটি লিখে রাখুন।
+      writer.on("finish", () => {
+        api.sendMessage({
+          body: "🔊 𝗕𝗼𝘀𝘀 𝗔𝘂𝘁𝗼 𝗥𝗲𝗽𝗹𝘆",
+          attachment: fs.createReadStream(file)
+        }, event.threadID, () => {
+          if (fs.existsSync(file)) fs.unlinkSync(file);
+        });
+      });
 
-⏳ সময় পেলেই তিনি অবশ্যই আপনার বার্তার উত্তর দেবেন।
-
-🤝 ধন্যবাদ। ভালো থাকবেন।`
-    };
-
-    const path = __dirname + "/cache/boss.mp3";
-
-    if (fs.existsSync(path)) {
-      msg.attachment = fs.createReadStream(path);
+    } catch (e) {
+      api.sendMessage(
+        "👑 আমার বস তারেক সরকার বর্তমানে ব্যস্ত আছেন। অনুগ্রহ করে কিছুক্ষণ পরে আবার যোগাযোগ করুন।",
+        event.threadID
+      );
     }
-
-    return api.sendMessage(msg, event.threadID, event.messageID);
   }
 };
 
