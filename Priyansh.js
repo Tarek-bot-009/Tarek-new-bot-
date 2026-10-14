@@ -313,4 +313,6 @@ function onBot({ models: botModel }) {
     } catch (error) { logger(global.getText('priyansh', 'successConnectDatabase', JSON.stringify(error)), '[ DATABASE ]'); }
 })();
 
-process.on('unhandledRejection', (err, p) => {});
+process.on('unhandledRejection', (err) => {
+    console.error('[UNHANDLED REJECTION]', err);
+});
