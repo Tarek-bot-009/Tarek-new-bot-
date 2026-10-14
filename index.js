@@ -1,82 +1,77 @@
 const { spawn } = require("child_process");
-const express = require("express");
-const path = require("path");
 const axios = require("axios");
 const logger = require("./utils/log");
 
+///////////////////////////////////////////////////////////
+//========= Create website for dashboard/uptime =========//
+///////////////////////////////////////////////////////////
+
+const express = require('express');
+const path = require('path');
+
 const app = express();
-const PORT = process.env.PORT || 8080;
+const port = process.env.PORT || 8080;
 
-app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "index.html"));
+// Serve the index.html file
+app.get('/', function (req, res) {
+    res.sendFile(path.join(__dirname, '/index.html'));
 });
 
-app.get("/health", (req, res) => {
-    res.json({
-        status: "online",
-        uptime: process.uptime(),
-        time: new Date()
-    });
+// Start the server and add error handling
+app.listen(port, () => {
+    logger(`Server is running on port ${port}...`, "[ Starting ]");
+}).on('error', (err) => {
+    if (err.code === 'EACCES') {
+        logger(`Permission denied. Cannot bind to port ${port}.`, "[ Error ]");
+    } else {
+        logger(`Server error: ${err.message}`, "[ Error ]");
+    }
 });
 
-app.listen(PORT, () => {
-    logger(`Server running on port ${PORT}`, "[ WEB ]");
-});
+/////////////////////////////////////////////////////////
+//========= Create start bot and make it loop =========//
+/////////////////////////////////////////////////////////
 
-let botProcess;
+// Initialize global restart counter
+global.countRestart = global.countRestart || 0;
 
-function startBot() {
-    logger("Starting Messenger Bot...", "[ BOT ]");
+function startBot(message) {
+    if (message) logger(message, "[ Starting ]");
 
-    botProcess = spawn("node", ["Priyansh.js"], {
+    const child = spawn("node", ["--trace-warnings", "--async-stack-traces", "Priyansh.js"], {
         cwd: __dirname,
-        shell: true,
-        stdio: "inherit"
+        stdio: "inherit",
+        shell: true
     });
 
-    botProcess.on("close", (code) => {
-        logger(`Bot exited with code ${code}`, "[ BOT ]");
-
-        setTimeout(() => {
-            logger("Restarting Bot...", "[ BOT ]");
+    child.on("close", (codeExit) => {
+        if (codeExit !== 0 && global.countRestart < 5) {
+            global.countRestart += 1;
+            logger(`Bot exited with code ${codeExit}. Restarting... (${global.countRestart}/5)`, "[ Restarting ]");
             startBot();
-        }, 5000);
+        } else {
+            logger(`Bot stopped after ${global.countRestart} restarts.`, "[ Stopped ]");
+        }
     });
 
-    botProcess.on("error", (err) => {
-        logger(err.message, "[ ERROR ]");
+    child.on("error", (error) => {
+        logger(`An error occurred: ${JSON.stringify(error)}`, "[ Error ]");
     });
-}
+};
 
-axios
-    .get("https://raw.githubusercontent.com/priyanshu192/bot/main/package.json")
+////////////////////////////////////////////////
+//========= Check update from Github =========//
+////////////////////////////////////////////////
+
+axios.get("https://raw.githubusercontent.com/priyanshu192/bot/main/package.json")
     .then((res) => {
         logger(res.data.name, "[ NAME ]");
-        logger(res.data.version, "[ VERSION ]");
+        logger(`Version: ${res.data.version}`, "[ VERSION ]");
         logger(res.data.description, "[ DESCRIPTION ]");
     })
-    .catch(() => {
-        logger("Unable to check update.", "[ UPDATE ]");
+    .catch((err) => {
+        logger(`Failed to fetch update info: ${err.message}`, "[ Update Error ]");
     });
 
-process.on("SIGINT", () => {
-    logger("Stopping Bot...", "[ EXIT ]");
-
-    if (botProcess) {
-        botProcess.kill();
-    }
-
-    process.exit(0);
-});
-
-process.on("SIGTERM", () => {
-    logger("Stopping Bot...", "[ EXIT ]");
-
-    if (botProcess) {
-        botProcess.kill();
-    }
-
-    process.exit(0);
-});
-
+// Start the bot
 startBot();
