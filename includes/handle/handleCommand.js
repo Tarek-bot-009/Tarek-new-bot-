@@ -38,15 +38,11 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     const threadSetting = threadData.get(thread) || {};
     const prefix = threadSetting.PREFIX || PREFIX;
 
-    const prefixRegex = new RegExp(
-      `^(<@!?${escapeRegex(sender)}>|${escapeRegex(prefix)})\\s*`
-    );
-
-    if (!prefixRegex.test(body)) return;
+    ​const prefixRegex = new RegExp(^${escapeRegex(prefix)});
 
     const adminbot = require("../../config.json");
 
-    if (
+    const command = client.commands.get(commandName);
       !global.data.allThreadID.includes(thread) &&
       !ADMINBOT.includes(sender) &&
       adminbot.adminPaOnly === true
