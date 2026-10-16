@@ -13,7 +13,7 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     );
 
     try {
-      if (!event || !event.body || !event.senderID || !event.threadID) return;
+      if (!event || !event.body || !event.senderID || !event.threadID) {
 
       const body = String(event.body);
       const senderID = String(event.senderID);
