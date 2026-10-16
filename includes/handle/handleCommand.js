@@ -67,14 +67,7 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
 
       console.log("HANDLE TEST: command =", commandName);
 
-      if (
-        senderID === threadID &&
-        !allowInbox &&
-        !ADMINBOT.includes(senderID)
-      ) {
-        console.log("HANDLE TEST: private inbox disabled");
-        return;
-      }
+      
 
       if (config.adminOnly && !ADMINBOT.includes(senderID)) {
         return api.sendMessage(
