@@ -5,12 +5,20 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
   const moment = require("moment-timezone");
 
   return async function ({ event }) {
+    // DEBUG: পরীক্ষা করা হচ্ছে মেসেজ হ্যান্ডলারে আসছে কি না
+    console.log(
+      "HANDLE TEST:",
+      event && event.body,
+      event && event.threadID
+    );
+
     try {
       if (!event || !event.body || !event.senderID || !event.threadID) return;
 
-      const { body, messageID } = event;
+      const body = String(event.body);
       const senderID = String(event.senderID);
       const threadID = String(event.threadID);
+      const messageID = event.messageID;
 
       const config = global.config || {};
       const data = global.data || {};
@@ -24,13 +32,15 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
       const commands = client.commands;
       const cooldowns = client.cooldowns;
 
+      console.log("HANDLE TEST: checking commands");
+
       if (!commands || typeof commands.get !== "function") {
-        logger("ERROR: global.client.commands is missing", "error");
+        console.error("ERROR: global.client.commands is missing");
         return;
       }
 
       if (!cooldowns || typeof cooldowns.has !== "function") {
-        logger("ERROR: global.client.cooldowns is missing", "error");
+        console.error("ERROR: global.client.cooldowns is missing");
         return;
       }
 
@@ -39,12 +49,14 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         String(api.getCurrentUserID()) === senderID
       ) return;
 
-      // Check prefix
       const threadData = data.threadData || new Map();
       const threadSetting = threadData.get(threadID) || {};
       const prefix = threadSetting.PREFIX || PREFIX;
 
-      if (!body.startsWith(prefix)) return;
+      if (!body.startsWith(prefix)) {
+        console.log("HANDLE TEST: prefix did not match");
+        return;
+      }
 
       const input = body.slice(prefix.length).trim();
       if (!input) return;
@@ -53,14 +65,17 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
       const commandName = (args.shift() || "").toLowerCase();
       if (!commandName) return;
 
-      // Private inbox setting
+      console.log("HANDLE TEST: command =", commandName);
+
       if (
         senderID === threadID &&
         !allowInbox &&
         !ADMINBOT.includes(senderID)
-      ) return;
+      ) {
+        console.log("HANDLE TEST: private inbox disabled");
+        return;
+      }
 
-      // Admin-only settings
       if (config.adminOnly && !ADMINBOT.includes(senderID)) {
         return api.sendMessage(
           "MODE » Only admins can use bots",
@@ -81,7 +96,6 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         );
       }
 
-      // Banned users/groups
       if (
         !ADMINBOT.includes(senderID) &&
         (
@@ -96,7 +110,6 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         );
       }
 
-      // Find command
       let command = commands.get(commandName);
 
       if (!command) {
@@ -112,6 +125,7 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
       }
 
       if (!command) {
+        console.log("HANDLE TEST: command not found:", commandName);
         return api.sendMessage(
           `❌ Command "${commandName}" not found. Type ${prefix}help.`,
           threadID,
@@ -120,11 +134,10 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
       }
 
       if (!command.config || typeof command.run !== "function") {
-        logger(`ERROR: invalid command file: ${commandName}`, "error");
+        console.error("ERROR: invalid command:", commandName);
         return;
       }
 
-      // Group information and permissions
       let permission = 0;
 
       if (ADMINBOT.includes(senderID)) {
@@ -143,7 +156,7 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
             permission = 1;
           }
         } catch (error) {
-          logger(`Could not get group info: ${error.message}`, "error");
+          console.error("Could not get group info:", error);
         }
       }
 
@@ -159,7 +172,6 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         );
       }
 
-      // Disabled commands
       const commandBanned = data.commandBanned || new Map();
 
       if (!ADMINBOT.includes(senderID)) {
@@ -178,7 +190,6 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         }
       }
 
-      // NSFW check
       if (
         String(command.config.commandCategory || "").toLowerCase() === "nsfw" &&
         !(data.threadAllowNSFW || []).includes(threadID) &&
@@ -191,7 +202,6 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         );
       }
 
-      // Cooldown
       const commandKey = command.config.name || commandName;
 
       if (!cooldowns.has(commandKey)) {
@@ -218,7 +228,6 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         );
       }
 
-      // Command language
       const language = config.language || "en";
 
       const getText = (...values) => {
@@ -242,7 +251,8 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         return text;
       };
 
-      // Run command
+      console.log("HANDLE TEST: running command", commandName);
+
       await Promise.resolve(command.run({
         api,
         event,
@@ -265,6 +275,11 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
       }
 
     } catch (error) {
+      console.error(
+        "HANDLE TEST ERROR:",
+        error && (error.stack || error)
+      );
+
       logger(
         `handleCommand ERROR: ${error.stack || error}`,
         "error"
@@ -277,7 +292,7 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
           event.messageID
         );
       } catch (sendError) {
-        logger(`Could not send error message: ${sendError.message}`, "error");
+        console.error("Could not send error message:", sendError);
       }
     }
   };
