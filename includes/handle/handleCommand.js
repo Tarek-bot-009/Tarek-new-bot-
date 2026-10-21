@@ -1,292 +1,191 @@
-
 module.exports = function ({ api, models, Users, Threads, Currencies }) {
-  const stringSimilarity = require("string-similarity");
-  const logger = require("../../utils/log.js");
+  const stringSimilarity = require('string-similarity'),
+    escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    logger = require("../../utils/log.js");
+  const axios = require('axios')
   const moment = require("moment-timezone");
-
   return async function ({ event }) {
-    // DEBUG: পরীক্ষা করা হচ্ছে মেসেজ হ্যান্ডলারে আসছে কি না
-    console.log(
-      "HANDLE TEST:",
-      event && event.body,
-      event && event.threadID
+    const dateNow = Date.now()
+    const time = moment.tz("Asia/Dhaka").format("HH:MM:ss DD/MM/YYYY");
+    const ADMINBOT = global.config.ADMINBOT || [];
+    const DEVELOPER = global.config.DEVELOPER || [];
+    const { allowInbox, PREFIX, DeveloperMode, adminOnly, keyAdminOnly, developerOnly, adminPaOnly } = global.config;
+    const { userBanned, threadBanned, threadInfo, threadData, commandBanned } = global.data;
+    const { commands, cooldowns } = global.client;
+    const resolveCommand = (token) => {
+      if (typeof global.client.resolveCommand === 'function') return global.client.resolveCommand(token);
+      const key = String(token || '').trim().toLowerCase();
+      for (const [name, command] of commands) if (String(name).toLowerCase() === key) return command;
+      const canonical = (global.client.commandAliases || new Map()).get(key);
+      return canonical === undefined ? null : (commands.get(canonical) || null);
+    };
+    const resolveCommandName = (token) => {
+      if (typeof global.client.resolveCommandName === 'function') return global.client.resolveCommandName(token);
+      for (const name of commands.keys()) if (String(name).toLowerCase() === String(token || '').trim().toLowerCase()) return name;
+      const canonical = (global.client.commandAliases || new Map()).get(String(token || '').trim().toLowerCase());
+      return canonical === undefined ? null : canonical;
+    };
+    var { body, senderID, threadID, messageID } = event;
+    var senderID = String(senderID),
+      threadID = String(threadID);
+    const threadSetting = threadData.get(threadID) || {}
+    const threadPrefix = String(
+      threadSetting.hasOwnProperty("PREFIX") && threadSetting.PREFIX
+        ? threadSetting.PREFIX
+        : PREFIX
     );
-
-    try {
-      if (!event || !event.body || !event.senderID || !event.threadID) {
-
-      const body = String(event.body);
-      const senderID = String(event.senderID);
-      const threadID = String(event.threadID);
-      const messageID = event.messageID;
-
-      const config = global.config || {};
-      const data = global.data || {};
-      const client = global.client || {};
-
-      const PREFIX = config.PREFIX || "/";
-      const ADMINBOT = (config.ADMINBOT || []).map(String);
-      const NDH = (config.NDH || []).map(String);
-      const allowInbox = config.allowInbox === true;
-
-      const commands = client.commands;
-      const cooldowns = client.cooldowns;
-
-      console.log("HANDLE TEST: checking commands");
-
-      if (!commands || typeof commands.get !== "function") {
-        console.error("ERROR: global.client.commands is missing");
-        return;
+    const prefixRegex = new RegExp(`^(<@!?${senderID}>|${escapeRegex(threadPrefix)})\\s*`);
+    const prefixOnlyMessage = typeof body === 'string' && body.trim() !== '' && body.trim() === threadPrefix;
+    const prefixMatch = prefixOnlyMessage ? [body] : (body ? body.match(prefixRegex) : null);
+    if (!prefixMatch && (!body || !body.trim())) return;
+    var noPrefixCommand = null;
+    if (!prefixMatch) {
+      const trimmedBody = String(body).trim();
+      if (!trimmedBody) return;
+      const noPrefixParts = trimmedBody.split(/ +/);
+      noPrefixCommand = resolveCommand(noPrefixParts[0]);
+      if (!noPrefixCommand) return;
+      const cmdUsePrefix = noPrefixCommand.config ? noPrefixCommand.config.usePrefix : undefined;
+      const allowNoPrefix = (cmdUsePrefix === true || cmdUsePrefix === false) ? cmdUsePrefix : (global.config.usePrefix === true);
+      if (!allowNoPrefix) return;
+    }
+    const adminbot = require('./../../config.json');
+    const isDeveloper = global.isDeveloper ? global.isDeveloper(senderID) : DEVELOPER.includes(senderID);
+    const isBotAdmin = ADMINBOT.includes(senderID.toString()) || ADMINBOT.includes(senderID);
+    const isDevOnly = adminbot.developerOnly === true || developerOnly === true;
+    const isAdminOnly = adminbot.adminOnly === true || adminOnly === true;
+    if (isDevOnly && !isDeveloper) return;
+    if (isAdminOnly && !isDeveloper && !isBotAdmin) return;
+    if (!global.data.allThreadID.includes(threadID) && !isBotAdmin && !isDeveloper && adminbot.adminPaOnly == true)
+    return api.sendMessage("MODE » Only admins can use bots in their own inbox", threadID, messageID)
+    const dataAdbox = require('../../Script/commands/cache/data.json');
+    var threadInf = (threadInfo.get(threadID) || await Threads.getInfo(threadID));
+    const findd = threadInf.adminIDs.find(el => el.id == senderID);
+    if (dataAdbox.adminbox.hasOwnProperty(threadID) && dataAdbox.adminbox[threadID] == true && !isBotAdmin && !isDeveloper && !findd && event.isGroup == true) return api.sendMessage('MODE » Only admins can use bots', event.threadID, event.messageID)
+    if (userBanned.has(senderID) || threadBanned.has(threadID) || allowInbox == ![] && senderID == threadID) {
+      if (!isBotAdmin && !isDeveloper) {
+        if (userBanned.has(senderID)) {
+          const { reason, dateAdded } = userBanned.get(senderID) || {};
+          return api.sendMessage(global.getText("handleCommand", "userBanned", reason, dateAdded), threadID, async (err, info) => {
+            await new Promise(resolve => setTimeout(resolve, 5 * 1000));
+            return api.unsendMessage(info.messageID);
+          }, messageID);
+        } else {
+          if (threadBanned.has(threadID)) {
+            const { reason, dateAdded } = threadBanned.get(threadID) || {};
+            return api.sendMessage(global.getText("handleCommand", "threadBanned", reason, dateAdded), threadID, async (err, info) => {
+              await new Promise(resolve => setTimeout(resolve, 5 * 1000));
+              return api.unsendMessage(info.messageID);
+            }, messageID);
+          }
+        }
       }
-
-      if (!cooldowns || typeof cooldowns.has !== "function") {
-        console.error("ERROR: global.client.cooldowns is missing");
-        return;
-      }
-
-      if (
-        api.getCurrentUserID &&
-        String(api.getCurrentUserID()) === senderID
-      ) return;
-
-      const threadData = data.threadData || new Map();
-      const threadSetting = threadData.get(threadID) || {};
-      const prefix = threadSetting.PREFIX || PREFIX;
-
-      if (!body.startsWith(prefix)) {
-        console.log("HANDLE TEST: prefix did not match");
-        return;
-      }
-
-      const input = body.slice(prefix.length).trim();
-      if (!input) return;
-
-      const args = input.split(/\s+/);
-      const commandName = (args.shift() || "").toLowerCase();
+    }
+    const matchedPrefix = prefixMatch ? prefixMatch[0] : '',
+      args = body.slice(matchedPrefix.length).trim().split(/ +/);
+    let commandName = args.shift().toLowerCase();
+    var command = prefixMatch && !commandName
+      ? [...commands.values()].find(cmd => cmd.config && cmd.config.prefixOnly === true)
+      : (prefixMatch ? resolveCommand(commandName) : noPrefixCommand);
+    if (command && !commandName) commandName = command.config.name;
+    if (!command) {
+      if (!prefixMatch) return;
       if (!commandName) return;
-
-      console.log("HANDLE TEST: command =", commandName);
-
-      
-
-      if (config.adminOnly && !ADMINBOT.includes(senderID)) {
-        return api.sendMessage(
-          "MODE » Only admins can use bots",
-          threadID,
-          messageID
-        );
+      const allCommandName = typeof global.client.commandCandidates === 'function'
+        ? global.client.commandCandidates()
+        : [...commands.keys()].map(String);
+      const checker = stringSimilarity.findBestMatch(commandName, allCommandName);
+      let suggestion = null;
+      if (checker.bestMatch.rating >= 0.5 && checker.bestMatch.target) {
+        suggestion = resolveCommandName(checker.bestMatch.target) || checker.bestMatch.target;
+        if (!commands.has(suggestion)) suggestion = null;
+        else command = commands.get(suggestion);
       }
-
-      if (
-        config.ndhOnly &&
-        !NDH.includes(senderID) &&
-        !ADMINBOT.includes(senderID)
-      ) {
-        return api.sendMessage(
-          "MODE » Only bot support can use bots",
-          threadID,
-          messageID
-        );
-      }
-
-      if (
-        !ADMINBOT.includes(senderID) &&
-        (
-          (data.userBanned && data.userBanned.has(senderID)) ||
-          (data.threadBanned && data.threadBanned.has(threadID))
-        )
-      ) {
-        return api.sendMessage(
-          "You or this group is restricted from using the bot.",
-          threadID,
-          messageID
-        );
-      }
-
-      let command = commands.get(commandName);
-
       if (!command) {
-        const names = Array.from(commands.keys());
-
-        if (names.length) {
-          const match = stringSimilarity.findBestMatch(commandName, names);
-
-          if (match.bestMatch.rating >= 0.5) {
-            command = commands.get(match.bestMatch.target);
-          }
-        }
+        const prefixUsed = threadSetting.hasOwnProperty("PREFIX") ? threadSetting.PREFIX : PREFIX;
+        const notExistText = suggestion
+          ? global.getText("handleCommand", "commandNotExist", `${prefixUsed}${suggestion}`)
+          : global.getText("handleCommand", "commandNotExistName", commandName, prefixUsed);
+        return api.sendMessage(notExistText, threadID);
       }
-
-      if (!command) {
-        console.log("HANDLE TEST: command not found:", commandName);
-        return api.sendMessage(
-          `❌ Command "${commandName}" not found. Type ${prefix}help.`,
-          threadID,
-          messageID
-        );
+    }
+    if (commandBanned.get(threadID) || commandBanned.get(senderID)) {
+      if (!isBotAdmin && !isDeveloper) {
+        const banThreads = commandBanned.get(threadID) || [],
+          banUsers = commandBanned.get(senderID) || [];
+        if (banThreads.includes(command.config.name))
+          return api.sendMessage(global.getText("handleCommand", "commandThreadBanned", command.config.name), threadID, async (err, info) => {
+            await new Promise(resolve => setTimeout(resolve, 5 * 1000))
+            return api.unsendMessage(info.messageID);
+          }, messageID);
+        if (banUsers.includes(command.config.name))
+          return api.sendMessage(global.getText("handleCommand", "commandUserBanned", command.config.name), threadID, async (err, info) => {
+            await new Promise(resolve => setTimeout(resolve, 5 * 1000));
+            return api.unsendMessage(info.messageID);
+          }, messageID);
       }
-
-      if (!command.config || typeof command.run !== "function") {
-        console.error("ERROR: invalid command:", commandName);
-        return;
-      }
-
-      let permission = 0;
-
-      if (ADMINBOT.includes(senderID)) {
-        permission = 3;
-      } else if (NDH.includes(senderID)) {
-        permission = 2;
-      } else if (event.isGroup === true) {
-        try {
-          const threadInfo = data.threadInfo || new Map();
-          const info = threadInfo.get(threadID) ||
-            await Threads.getInfo(threadID);
-
-          const admins = Array.isArray(info.adminIDs) ? info.adminIDs : [];
-
-          if (admins.some(item => String(item.id) === senderID)) {
-            permission = 1;
-          }
-        } catch (error) {
-          console.error("Could not get group info:", error);
-        }
-      }
-
-      const requiredPermission = Number(
-        command.config.hasPermssion || 0
-      );
-
-      if (requiredPermission > permission) {
-        return api.sendMessage(
-          "You don't have permission to use this command.",
-          threadID,
-          messageID
-        );
-      }
-
-      const commandBanned = data.commandBanned || new Map();
-
-      if (!ADMINBOT.includes(senderID)) {
-        const bannedThreads = commandBanned.get(threadID) || [];
-        const bannedUsers = commandBanned.get(senderID) || [];
-
-        if (
-          bannedThreads.includes(command.config.name) ||
-          bannedUsers.includes(command.config.name)
-        ) {
-          return api.sendMessage(
-            "This command is disabled for you or this group.",
-            threadID,
-            messageID
-          );
-        }
-      }
-
-      if (
-        String(command.config.commandCategory || "").toLowerCase() === "nsfw" &&
-        !(data.threadAllowNSFW || []).includes(threadID) &&
-        !ADMINBOT.includes(senderID)
-      ) {
-        return api.sendMessage(
-          "NSFW commands are not enabled in this group.",
-          threadID,
-          messageID
-        );
-      }
-
-      const commandKey = command.config.name || commandName;
-
-      if (!cooldowns.has(commandKey)) {
-        cooldowns.set(commandKey, new Map());
-      }
-
-      const timestamps = cooldowns.get(commandKey);
-      const now = Date.now();
-      const cooldownMs = Math.max(
-        0,
-        Number(command.config.cooldowns || 1) * 1000
-      );
-      const lastUsed = timestamps.get(senderID);
-
-      if (lastUsed && now < lastUsed + cooldownMs) {
-        const remaining = Math.ceil(
-          (lastUsed + cooldownMs - now) / 1000
-        );
-
-        return api.sendMessage(
-          `Please wait ${remaining} second(s) before using this command again.`,
-          threadID,
-          messageID
-        );
-      }
-
-      const language = config.language || "en";
-
-      const getText = (...values) => {
-        const languages = command.languages;
-
-        if (
-          !languages ||
-          !languages[language] ||
-          !languages[language][values[0]]
-        ) return "";
-
-        let text = languages[language][values[0]];
-
-        for (let i = 1; i < values.length; i++) {
-          text = text.replace(
-            new RegExp("%" + i, "g"),
-            String(values[i])
-          );
-        }
-
-        return text;
-      };
-
-      console.log("HANDLE TEST: running command", commandName);
-
-      await Promise.resolve(command.run({
-        api,
-        event,
-        args,
-        models,
-        Users,
-        Threads,
-        Currencies,
-        permssion: permission,
-        getText
-      }));
-
-      timestamps.set(senderID, now);
-
-      if (config.DeveloperMode === true) {
-        logger(
-          `Executed ${commandName} at ${moment.tz("Asia/Kolkata").format("HH:mm:ss DD/MM/YYYY")}`,
-          "[ DEV MODE ]"
-        );
-      }
-
-    } catch (error) {
-      console.error(
-        "HANDLE TEST ERROR:",
-        error && (error.stack || error)
-      );
-
-      logger(
-        `handleCommand ERROR: ${error.stack || error}`,
-        "error"
-      );
-
+    }
+    if (command.config.commandCategory.toLowerCase() == 'nsfw' && !global.data.threadAllowNSFW.includes(threadID) && !isBotAdmin && !isDeveloper)
+      return api.sendMessage(global.getText("handleCommand", "threadNotAllowNSFW"), threadID, async (err, info) => {
+        await new Promise(resolve => setTimeout(resolve, 5 * 1000))
+        return api.unsendMessage(info.messageID);
+      }, messageID);
+    var threadInfo2;
+    if (event.isGroup == !![])
       try {
-        api.sendMessage(
-          "⚠️ কমান্ড চালাতে সমস্যা হয়েছে। GitHub Actions-এর error দেখো।",
-          String(event.threadID),
-          event.messageID
-        );
-      } catch (sendError) {
-        console.error("Could not send error message:", sendError);
+        threadInfo2 = (threadInfo.get(threadID) || await Threads.getInfo(threadID))
+        if (Object.keys(threadInfo2).length == 0) throw new Error();
+      } catch (err) {
+        logger(global.getText("handleCommand", "cantGetInfoThread", "error"));
       }
+    var permssion = 0;
+    var threadInfoo = (threadInfo.get(threadID) || await Threads.getInfo(threadID));
+    const find = threadInfoo.adminIDs.find(el => el.id == senderID);
+    if (find) permssion = 1;
+    if (isBotAdmin) permssion = 2;
+    if (isDeveloper) permssion = 3;
+    const commandPermission = command.config.hasPermssion !== undefined
+      ? command.config.hasPermssion
+      : (command.config.hasPermission !== undefined
+        ? command.config.hasPermission
+        : (command.config.permission !== undefined ? command.config.permission : 0));
+    if (commandPermission > permssion) return api.sendMessage(global.getText("handleCommand", "permssionNotEnough", command.config.name), event.threadID, event.messageID);
+       if (!client.cooldowns.has(command.config.name)) client.cooldowns.set(command.config.name, new Map());
+        const timestamps = client.cooldowns.get(command.config.name);;
+        const expirationTime = (command.config.cooldowns || 1) * 1000;
+        if (!isBotAdmin && !isDeveloper && timestamps.has(senderID) && dateNow < timestamps.get(senderID) + expirationTime)
+      return api.sendMessage(`You just used this command and\ntry again later ${((timestamps.get(senderID) + expirationTime - dateNow)/1000).toString().slice(0, 5)} In another second, use the order again slowly`, threadID, messageID);
+    var getText2;
+    if (command.languages && typeof command.languages == 'object' && command.languages.hasOwnProperty(global.config.language))
+      getText2 = (...values) => {
+        var lang = command.languages[global.config.language][values[0]] || '';
+        for (var i = values.length; i > 0x2533 + 0x1105 + -0x3638; i--) {
+          const expReg = RegExp('%' + i, 'g');
+          lang = lang.replace(expReg, values[i]);
+        }
+        return lang;
+      };
+    else getText2 = () => { };
+    try {
+      const Obj = {};
+      Obj.api = api
+      Obj.event = event
+      Obj.args = args
+      Obj.models = models
+      Obj.Users = Users
+      Obj.Threads = Threads
+      Obj.Currencies = Currencies
+      Obj.permssion = permssion
+      Obj.getText = getText2
+      Obj.commandName = command.config.name
+      Obj.usedName = commandName
+      command.run(Obj);
+      timestamps.set(senderID, dateNow);
+      if (DeveloperMode == !![])
+        logger(global.getText("handleCommand", "executeCommand", time, commandName, senderID, threadID, args.join(" "), (Date.now()) - dateNow), "[ DEV MODE ]");
+      return;
+    } catch (e) {
+      return api.sendMessage(global.getText("handleCommand", "commandError", commandName, e), threadID);
     }
   };
 };
