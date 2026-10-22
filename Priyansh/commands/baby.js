@@ -1,42 +1,79 @@
-const axios = require("axios");
-
-const apiList = "https://raw.githubusercontent.com/sahu-uhas/SAHU-API/refs/heads/main/API.json";
-const getMainAPI = async () => (await axios.get(apiList)).data.simsimi;
-
-module.exports.config = {
- name: "baby",
- version: "1.0.3",
- hasPermssion: 0,
- credits: "ULLASH",
- description: "Cute AI Baby Chatbot | Talk, Teach & Chat with Emotion ☢️",
- commandCategory: "Chat",
- usages: "[message/query]",
- cooldowns: 0,
- prefix: true
+  module.exports.config = {
+  name: "baby",
+  version: "1.0.4",
+  hasPermssion: 0,
+  credits: "ULLASH",
+  description: "Cute AI Baby Chatbot",
+  commandCategory: "Chat",
+  usages: "[message/query]",
+  cooldowns: 0,
+  prefix: true
 };
 
 module.exports.run = async function ({ api, event, args, Users }) {
- try {
- const uid = event.senderID;
- const senderName = await Users.getNameUser(uid);
- const rawQuery = args.join(" ");
- const query = rawQuery.toLowerCase();
- const simsim = await getMainAPI();
+  const uid = event.senderID;
+  const senderName = await Users.getNameUser(uid);
+  const msg = args.join(" ");
 
- if (!query) {
- const ran = ["Bolo baby", "hum"];
- const r = ran[Math.floor(Math.random() * ran.length)];
- return api.sendMessage(r, event.threadID, (err, info) => {
- if (!err) {
- global.client.handleReply.push({
- name: module.exports.config.name,
- messageID: info.messageID,
- author: event.senderID,
- type: "simsimi"
- });
- }
- });
- }
+  if (!msg) {
+    const ran = ["Bolo baby", "hum", "kya bolna hai?"];
+    const r = ran[Math.floor(Math.random() * ran.length)];
+    return api.sendMessage(r, event.threadID, (err, info) => {
+      if (!err) {
+        global.client.handleReply.push({
+          name: module.exports.config.name,
+          messageID: info.messageID,
+          author: event.senderID,
+          type: "simsimi"
+        });
+      }
+    });
+  }
+
+  try {
+    const url = `https://api.simsimi.net/v2/?text=${encodeURIComponent(msg)}&lang=bn`;
+    const res = await axios.get(url);
+    let reply = res.data.success || "idk 😅";
+
+    return api.sendMessage(reply, event.threadID, (err, info) => {
+      if (!err) {
+        global.client.handleReply.push({
+          name: module.exports.config.name,
+          messageID: info.messageID,
+          author: uid,
+          type: "simsimi"
+        });
+      }
+    });
+  } catch (err) {
+    console.log("Baby error:", err);
+    return api.sendMessage("baby এখন অফলাইন 💤", event.threadID);
+  }
+}
+
+// handleReply এর জন্য
+module.exports.handleReply = async function({ api, event, handleReply }) {
+  if (handleReply.type !== "simsimi" || handleReply.author !== event.senderID) return;
+
+  try {
+    const url = `https://api.simsimi.net/v2/?text=${encodeURIComponent(event.body)}&lang=bn`;
+    const res = await axios.get(url);
+    let reply = res.data.success || "hmm";
+
+    return api.sendMessage(reply, event.threadID, (err, info) => {
+      if (!err) {
+        global.client.handleReply.push({
+          name: module.exports.config.name,
+          messageID: info.messageID,
+          author: event.senderID,
+          type: "simsimi"
+        });
+      }
+    });
+  } catch {
+    return api.sendMessage("baby ঘুমাই গেছে 💤", event.threadID);
+  }
+}
 
  const command = args[0].toLowerCase();
 
