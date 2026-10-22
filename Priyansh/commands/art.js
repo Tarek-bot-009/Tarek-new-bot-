@@ -1,63 +1,53 @@
-const axios = require('axios');
-
-const baseApiUrl = async () => {
-  const base = await axios.get(
-    `https://raw.githubusercontent.com/Blankid018/D1PT0/main/baseApiUrl.json`
-  );
-  return base.data.api;
+module.exports.config = {
+ name: "art",
+ version: "1.0.0",
+ hasPermssion: 0,
+ credits: "𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 ⚠️ 𝑻𝑬𝑨𝑴_ ☢️",
+ description: "Apply AI art style (anime)",
+ commandCategory: "editing",
+ usages: "reply to an image",
+ cooldowns: 5
 };
 
-module.exports = {
-  config: {
-    name: "art",
-    version: "1.6.9",
-    credits: "Nazrul",
-    hasPermssion: 0,
-    description: "{pn} - Enhance your photos with  artful transformations!",
-    prefix: true,
-    usePrefix: true,
-    commandCategory: "art",
-    cooldowns: 5,
-    usages:"{pn} reply to a image"
-  },
-  run: async function ({ message, event, args, api }) {
-    try {
-      const cp = ["bal","zombie","anime","ghost", "watercolor", "sketch", "abstract", "cartoon","monster"];
-      const prompts = args[0] || cp[Math.floor(Math.random() * cp.length)];
+module.exports.run = async ({ api, event }) => {
+ const axios = require('axios');
+ const fs = require('fs-extra');
+ const FormData = require('form-data');
+ const path = __dirname + `/cache/artify.jpg`;
 
-      const msg = await api.sendMessage("🎨 Processing your image, please wait...", event.threadID);
+ const { messageReply, threadID, messageID } = event;
 
-      let photoUrl = "";
+ if (!messageReply || !messageReply.attachments || messageReply.attachments.length === 0) {
+ return api.sendMessage("❌ অনুগ্রহ করে কোনো একটি ছবির রিপ্লাই দিন।", threadID, messageID);
+ }
 
-      if (event.type === "message_reply" && event.messageReply?.attachments?.length > 0) {
-        photoUrl = event.messageReply.attachments[0].url;
-      } else if (args.length > 0) {
-        photoUrl = args.join(' ');
-      }
+ const url = messageReply.attachments[0].url;
 
-      if (!photoUrl) {
-        return api.sendMessage("🔰 Please reply to an image or provide a URL!", event.threadID, event.messageID);
-      }
+ try {
+ // ডাউনলোড করে লোকাল সেভ
+ const response = await axios.get(url, { responseType: "arraybuffer" });
+ fs.writeFileSync(path, Buffer.from(response.data, "utf-8"));
 
-      const response = await axios.get(`${await baseApiUrl()}/art2?url=${encodeURIComponent(photoUrl)}&prompt=${encodeURIComponent(prompts)}`);
+ // ফর্ম ডেটা তৈরি করে API তে পাঠানো
+ const form = new FormData();
+ form.append("image", fs.createReadStream(path));
 
-      if (!response.data || !response.data.imageUrl) {
-        await api.sendMessage("⚠ Failed to return a valid image URL. Please try again.", event.threadID, event.messageID);
-        return;
-      }
+ const apiRes = await axios.post(
+ "https://art-api-97wn.onrender.com/artify?style=anime",
+ form,
+ { headers: form.getHeaders(), responseType: "arraybuffer" }
+ );
 
-      const imageUrl = response.data.imageUrl;
-      await api.unsendMessage(msg.messageID);
+ // রেসপন্স সেভ করে পাঠানো
+ fs.writeFileSync(path, apiRes.data);
 
-      const imageStream = await axios.get(imageUrl, { responseType: 'stream' });
+ api.sendMessage({
+ body: "✅ AI artify করা হয়েছে!",
+ attachment: fs.createReadStream(path)
+ }, threadID, () => fs.unlinkSync(path), messageID);
 
-      await api.sendMessage({ 
-        body: `Here's your artful image! 🎨`, 
-        attachment: imageStream.data 
-      }, event.threadID, event.messageID);
-
-    } catch (error) {
-      await api.sendMessage(`Error: ${error.message}`, event.threadID, event.messageID);
-    }
-  }
+ } catch (err) {
+ console.error(err);
+ api.sendMessage("❌ কিছু একটা ভুল হয়েছে। আবার চেষ্টা করুন।", threadID, messageID);
+ }
 };
