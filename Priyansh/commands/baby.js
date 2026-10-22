@@ -1,53 +1,12 @@
 const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
-const crypto = require("crypto");
-
 let count_req = 0;
-// Credit: 乛 M𝆠፝֟R ཐི༏ཋྀ JU𝆠፝֟W𝆠፝֟ELꜛཐི༏ཋྀ࿐
 
-// ====== API URL ======
-const baseApiUrl = "https://noobs-api.top/dipto/baby";
-
-// ====== বটের ক্রেডিট ======
-const BOT_CREDIT = "乛 M𝆠፝֟R ཐི༏ཋྀ JU𝆠፝֟W𝆠፝֟ELꜛཐི༏ཋྀ࿐";
-
-// ====== CREDIT PROTECTION ======
-const sha = (s) => crypto.createHash("sha256").update(String(s)).digest("hex");
-const CREDIT_HASH = "8f74924e81a157abaf089d90717e48a4949617a7379d20a2df567cb0ab0dad81";
-
-// ফাইলের সোর্স কোড পড়ে সব জায়গার ক্রেডিট চেক করে (কমেন্ট লাইন সহ)
-function sourceCreditsValid() {
-  try {
-    const src = fs.readFileSync(__filename, "utf8");
-    const found = [
-      src.match(/^\/\/ Credit: (.*)$/m),
-      src.match(/^const BOT_CREDIT = "(.*)";$/m),
-      src.match(/^  credits: "(.*)",$/m),
-      src.match(/অরিজিনাল ক্রেডিট দিন:\\n(.*?)\\n\\n/)
-    ];
-    return found.every((m) => m && sha(m[1]) === CREDIT_HASH);
-  } catch (e) {
-    return false;
-  }
-}
-const SOURCE_CREDIT_OK = sourceCreditsValid();
-
-function isCreditValid() {
-  return (
-    SOURCE_CREDIT_OK &&
-    sha(BOT_CREDIT) === CREDIT_HASH &&
-    sha(module.exports.config && module.exports.config.credits) === CREDIT_HASH
-  );
-}
-
-const CREDIT_WARNING =
-  `⚠️ ক্রেডিট চেঞ্জ করার কারণে BABY কোড কাজ করছে না!\n\n` +
-  `✅ অরিজিনাল ক্রেডিট দিন:\n乛 M𝆠፝֟R ཐི༏ཋྀ JU𝆠፝֟W𝆠፝֟ELꜛཐི༏ཋྀ࿐\n\n` +
-  `অরিজিনাল ক্রেডিট দিলে BABY কোড আবার কাজ করবে।`;
+// Credit: Tarek sarker
+const baseApiUrl = "https://noobs-api.top/dipto/baby?text="; 
 
 // ====== ডাবল রিপ্লাই গার্ড ======
-// একই মেসেজ একাধিকবার প্রসেস হলে দ্বিতীয়বার থেকে স্কিপ করবে
 const handledMessages = new Set();
 function alreadyHandled(id) {
   if (!id) return false;
@@ -58,7 +17,6 @@ function alreadyHandled(id) {
 }
 
 // ====== বেবি কোডের নিজের পাঠানো মেসেজ ট্র্যাক করা ======
-// শুধু এই কোডের পাঠানো মেসেজে রিপ্লাই দিলেই AI রিপ্লাই যাবে, অন্য কমান্ডের মেসেজে নয়
 const babyMessageIDs = new Set();
 function trackMessage(id) {
   if (!id) return;
@@ -67,43 +25,28 @@ function trackMessage(id) {
     babyMessageIDs.delete(babyMessageIDs.values().next().value);
   }
 }
-
 function sendTracked(api, msg, threadID, replyToID) {
   return new Promise((resolve) => {
     let done = false;
     const finish = (info) => { if (!done) { done = true; resolve(info); } };
-    const cb = (err, info) => {
-      if (!err && info && info.messageID) trackMessage(info.messageID);
-      finish(info);
-    };
-    try {
-      if (replyToID) api.sendMessage(msg, threadID, cb, replyToID);
-      else api.sendMessage(msg, threadID, cb);
-    } catch (e) { finish(null); }
+    const cb = (err, info) => { if (!err && info && info.messageID) trackMessage(info.messageID); finish(info); };
+    try { if (replyToID) api.sendMessage(msg, threadID, cb, replyToID); else api.sendMessage(msg, threadID, cb); } 
+    catch (e) { finish(null); }
     setTimeout(() => finish(null), 15000);
   });
 }
 
-// ====== ট্রিগার লিস্ট (বাংলা + ইংরেজি) ======
+// ====== ট্রিগার লিস্ট (বাংলা + ইংরেজি সব) ======
 const TRIGGER_WORDS = [
-  "baby", "robot", "bby", "jan", "bbz", "kolixa", "babu",
-  "nila", "jui", "tisha", "pia", "pakhi", "mim", "maria", "hippi", "mari", "xan",
-  "নিলা", "নীলা", "জুই", "তিশা", "পিয়া", "পাখি", "মিম",
-  "জান", "বট", "বেবি", "বাবু"
+  "baby", "robot", "bby", "jan", "bbz", "kolixa", "babu", "nila", "jui", "tisha", "pia", "pakhi", "mim", "maria", "hippi", "mari", "xan",
+  "নিলা", "নীলা", "জুই", "তিশা", "পিয়া", "পাখি", "মিম", "জান", "বট", "বেবি", "বাবু", "রিয়া"
 ];
 
 // ====== বোল্ড ফন্ট ======
 function toBoldFont(text) {
-  const map = {
-    'A':'𝗔','B':'𝗕','C':'𝗖','D':'𝗗','E':'𝗘','F':'𝗙','G':'𝗚','H':'𝗛','I':'𝗜','J':'𝗝','K':'𝗞','L':'𝗟','M':'𝗠','N':'𝗡','O':'𝗢','P':'𝗣','Q':'𝗤','R':'𝗥','S':'𝗦','T':'𝗧','U':'𝗨','V':'𝗩','W':'𝗪','X':'𝗫','Y':'𝗬','Z':'𝗭',
-    'a':'𝗮','b':'𝗯','c':'𝗰','d':'𝗱','e':'𝗲','f':'𝗳','g':'𝗴','h':'𝗵','i':'𝗶','j':'𝗷','k':'𝗸','l':'𝗹','m':'𝗺','n':'𝗻','o':'𝗼','p':'𝗽','q':'𝗾','r':'𝗿','s':'𝘀','t':'𝘁','u':'𝘂','v':'𝘃','w':'𝘄','x':'𝘅','y':'𝘆','z':'𝘇',
-    '0':'𝟬','1':'𝟭','2':'𝟮','3':'𝟯','4':'𝟰','5':'𝟱','6':'𝟲','7':'𝟳','8':'𝟴','9':'𝟵'
-  };
-  let out = "";
-  for (const ch of text) out += map[ch] || ch;
-  return out;
+  const map = { 'A':'𝗔','B':'𝗕','C':'𝗖','D':'𝗗','E':'𝗘','F':'𝗙','G':'𝗚','H':'𝗛','I':'𝗜','J':'𝗝','K':'𝗞','L':'𝗟','M':'𝗠','N':'𝗡','O':'𝗢','P':'𝗣','Q':'𝗤','R':'𝗥','S':'𝗦','T':'𝗧','U':'𝗨','V':'𝗩','W':'𝗪','X':'𝗫','Y':'𝗬','Z':'𝗭','a':'𝗮','b':'𝗯','c':'𝗰','d':'𝗱','e':'𝗲','f':'𝗳','g':'𝗴','h':'𝗵','i':'𝗶','j':'𝗷','k':'𝗸','l':'𝗹','m':'𝗺','n':'𝗻','o':'𝗼','p':'𝗽','q':'𝗾','r':'𝗿','s':'𝘀','t':'𝘁','u':'𝘂','v':'𝘃','w':'𝘄','x':'𝘅','y':'𝘆','z':'𝘇','0':'𝟬','1':'𝟭','2':'𝟮','3':'𝟯','4':'𝟰','5':'𝟱','6':'𝟲','7':'𝟳','8':'𝟴','9':'𝟵' };
+  let out = ""; for (const ch of text) out += map[ch] || ch; return out;
 }
-
 function processReply(text) {
   if (!text) return "";
   const protectedNumber = "+8801943488192";
@@ -116,24 +59,65 @@ function processReply(text) {
 async function sendTypingIndicator(api, threadID) {
   try {
     if (typeof api.sendTyping === 'function') { await api.sendTyping(threadID); return true; }
-    if (global.mqttClient) {
-      global.mqttClient.publish('/ls_req', JSON.stringify({
-        app_id: 2220391788200892,
-        payload: JSON.stringify({
-          label: 3,
-          payload: JSON.stringify({
-            thread_key: threadID.toString(),
-            is_group_thread: +(threadID.toString().length >= 16),
-            is_typing: 1, attribution: 0
-          }),
-          version: 5849951561777440
-        }),
-        request_id: ++count_req, type: 4
-      }));
-      return true;
-    }
     return false;
   } catch (e) { return false; }
+}
+
+module.exports.config = {
+  name: "baby",
+  version: "1.0.7",
+  hasPermssion: 0,
+  credits: "তারেক", 
+  description: "Cute AI Baby Chatbot | Talk, Teach & Chat with Emotion ☢️",
+  commandCategory: "Chat",
+  usages: "[message/query]",
+  cooldowns: 0,
+  prefix: true
+};
+
+module.exports.run = async function ({ api, event, args, Users }) {
+  if (alreadyHandled(event.messageID)) return;
+
+  const msg = args.join(" ").trim();
+  const lowerMsg = msg.toLowerCase();
+
+  // শুধু ট্রিগার শব্দ লিখলে র্যান্ডম রিপ্লাই
+  if (!msg || TRIGGER_WORDS.includes(lowerMsg)) {
+    const ran = ["Bolo baby 💕", "হুম বলো", "ki bolba?", "বলো জান", "kya bolna hai?"];
+    const r = ran[Math.floor(Math.random() * ran.length)];
+    return sendTracked(api, r, event.threadID, event.messageID);
+  }
+
+  try {
+    await sendTypingIndicator(api, event.threadID);
+    const url = `${baseApiUrl}${encodeURIComponent(msg)}`;
+    const res = await axios.get(url, { timeout: 10000 });
+    
+    let reply = res.data.reply || res.data.message || "baby বুঝে নাই 😅";
+    reply = processReply(reply);
+
+    return sendTracked(api, reply, event.threadID, event.messageID);
+  } catch (err) {
+    console.log("Baby API error:", err);
+    return sendTracked(api, "baby এখন অফলাইন 💤", event.threadID, event.messageID);
+  }
+}
+
+module.exports.handleReply = async function({ api, event, handleReply }) {
+  if (handleReply.name !== module.exports.config.name || handleReply.author !== event.senderID) return;
+
+  try {
+    await sendTypingIndicator(api, event.threadID);
+    const url = `${baseApiUrl}${encodeURIComponent(event.body)}`;
+    const res = await axios.get(url, { timeout: 10000 });
+    
+    let reply = res.data.reply || res.data.message || "hmm";
+    reply = processReply(reply);
+
+    return sendTracked(api, reply, event.threadID, event.messageID);
+  } catch {
+    return sendTracked(api, "baby ঘুমাই গেছে 💤", event.threadID, event.messageID);
+  }
 }
 
 async function stopTypingIndicator(api, threadID) {
