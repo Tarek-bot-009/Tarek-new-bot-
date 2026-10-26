@@ -266,7 +266,57 @@ module.exports = function ({ api, models }) {
     //========= Send event to handle need =========//
     /////////////////////////////////////////////////
 
+
+    // ===== মেনশন ফিক্স: Facebook যদি mentions না পাঠায়, তাহলে নিজেরা বের করি =====
+    function fixMentions(event) {
+        try {
+            if (!event || typeof event.body !== "string") return;
+            if (!event.mentions || typeof event.mentions !== "object") event.mentions = {};
+            if (Object.keys(event.mentions).length > 0) return;
+
+            const body = event.body;
+            const lower = body.toLowerCase();
+            const names = global.data.userName;
+            const info = global.data.threadInfo.get(String(event.threadID)) || {};
+            const members = Array.isArray(info.participantIDs) && info.participantIDs.length ? info.participantIDs.map(String) : null;
+
+            // 1) "@Name" লেখা থেকে নাম মিলিয়ে ID বের করা (লম্বা নাম আগে)
+            if (body.includes("@") && names && names.size) {
+                const list = [];
+                for (const [id, name] of names.entries()) {
+                    if (!name || String(name).length < 2) continue;
+                    if (members && !members.includes(String(id))) continue;
+                    list.push([String(id), String(name)]);
+                }
+                list.sort((a, b) => b[1].length - a[1].length);
+                let rest = lower;
+                for (const [id, name] of list) {
+                    const tag = "@" + name.toLowerCase();
+                    if (rest.includes(tag)) {
+                        event.mentions[id] = "@" + name;
+                        rest = rest.split(tag).join(" ");
+                    }
+                }
+            }
+            if (Object.keys(event.mentions).length > 0) return;
+
+            // 2) কারো মেসেজে রিপ্লাই দিয়ে কমান্ড দিলে সেই ব্যক্তিকে মেনশন ধরা
+            if (event.messageReply && event.messageReply.senderID) {
+                const rid = String(event.messageReply.senderID);
+                if (rid !== String(api.getCurrentUserID())) {
+                    event.mentions[rid] = "@" + (names.get(rid) || "User");
+                    return;
+                }
+            }
+
+            // 3) সরাসরি UID লিখলে (যেমন /love 1000123456789)
+            const m = body.match(/\b(\d{10,17})\b/);
+            if (m) event.mentions[m[1]] = "@" + (names.get(m[1]) || "User");
+        } catch (e) { console.log("[fixMentions]", e); }
+    }
+
     return (event) => {
+        if (event.type == "message" || event.type == "message_reply") fixMentions(event);
         switch (event.type) {
           case "message":
           case "message_reply":
@@ -288,3 +338,4 @@ module.exports = function ({ api, models }) {
         }
       };
 };
+        
