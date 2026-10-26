@@ -4,7 +4,24 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     logger = require("../../utils/log.js");
   const axios = require('axios')
   const moment = require("moment-timezone");
+  async function safeThreadInfo(threadID) {
+    const cached = global.data.threadInfo.get(threadID);
+    if (cached && Array.isArray(cached.adminIDs)) return cached;
+    try {
+      const info = await Threads.getInfo(threadID);
+      if (info && Array.isArray(info.adminIDs)) {
+        global.data.threadInfo.set(threadID, info);
+        return info;
+      }
+    } catch (e) { }
+    // fallback: যদি Facebook থেকে গ্রুপের info না আসে, তবুও বট যেন কাজ করে
+    return { threadName: "", adminIDs: [], participantIDs: [], nicknames: {}, userInfo: [] };
+  }
   return async function ({ event }) {
+    try { return await handle({ event }); }
+    catch (e) { console.log("[handleCommand error]", e); }
+  };
+  async function handle({ event }) {
     const dateNow = Date.now()
     const time = moment.tz("Asia/Kolkata").format("HH:MM:ss DD/MM/YYYY");
     const { allowInbox, PREFIX, ADMINBOT, NDH, DeveloperMode, adminOnly, keyAdminOnly, ndhOnly,adminPaOnly } = global.config;
@@ -28,7 +45,7 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
       if (!NDH.includes(senderID) && !ADMINBOT.includes(senderID) && adminbot.ndhOnly == true) return api.sendMessage('MODE » Only bot support can use bots', threadID, messageID)
     }
     const dataAdbox = require('../../Priyansh/commands/cache/data.json');
-    var threadInf = (threadInfo.get(threadID) || await Threads.getInfo(threadID));
+    var threadInf = await safeThreadInfo(threadID);
     const findd = threadInf.adminIDs.find(el => el.id == senderID);
     if (dataAdbox.adminbox.hasOwnProperty(threadID) && dataAdbox.adminbox[threadID] == true && !ADMINBOT.includes(senderID) && !findd && event.isGroup == true) return api.sendMessage('MODE » Only admins can use bots', event.threadID, event.messageID)
     if (userBanned.has(senderID) || threadBanned.has(threadID) || allowInbox == ![] && senderID == threadID) {
@@ -87,13 +104,12 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     var threadInfo2;
     if (event.isGroup == !![])
       try {
-        threadInfo2 = (threadInfo.get(threadID) || await Threads.getInfo(threadID))
-        if (Object.keys(threadInfo2).length == 0) throw new Error();
+        threadInfo2 = await safeThreadInfo(threadID);
       } catch (err) {
         logger(global.getText("handleCommand", "cantGetInfoThread", "error"));
       }
     var permssion = 0;
-    var threadInfoo = (threadInfo.get(threadID) || await Threads.getInfo(threadID));
+    var threadInfoo = threadInf;
     const find = threadInfoo.adminIDs.find(el => el.id == senderID);
     if (NDH.includes(senderID.toString())) permssion = 2;
     if (ADMINBOT.includes(senderID.toString())) permssion = 3;
@@ -128,13 +144,17 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
       Obj.Currencies = Currencies
       Obj.permssion = permssion
       Obj.getText = getText2
-      command.run(Obj);
       timestamps.set(senderID, dateNow);
+      Promise.resolve(command.run(Obj)).catch(e => {
+        console.log("[command error]", commandName, e);
+        api.sendMessage(global.getText("handleCommand", "commandError", commandName, e), threadID);
+      });
       if (DeveloperMode == !![])
         logger(global.getText("handleCommand", "executeCommand", time, commandName, senderID, threadID, args.join(" "), (Date.now()) - dateNow), "[ DEV MODE ]");
       return;
     } catch (e) {
       return api.sendMessage(global.getText("handleCommand", "commandError", commandName, e), threadID);
     }
-  };
+  }
 };
+                                                                                                                      
