@@ -9,7 +9,13 @@ module.exports = function ({ Users, Threads, Currencies }) {
         var threadID = String(threadID);
         try {
             if (!allThreadID.includes(threadID) && event.isGroup == !![]) {
-                const threadIn4 = await Threads.getInfo(threadID);
+                let threadIn4;
+                try { threadIn4 = await Threads.getInfo(threadID); } catch (e) { threadIn4 = null; }
+                if (!threadIn4 || !Array.isArray(threadIn4.adminIDs)) {
+                    // getThreadInfo ব্যর্থ হলে মেমোরিতে ফাঁকা info রাখি যাতে বট চুপ না থাকে; পরের মেসেজে আবার চেষ্টা হবে
+                    if (!threadInfo.has(threadID)) threadInfo.set(threadID, { threadName: "", adminIDs: [], nicknames: {} });
+                    throw new Error("getThreadInfo failed for " + threadID);
+                }
                 const setting = {};
                 setting.threadName = threadIn4.threadName
                 setting.adminIDs = threadIn4.adminIDs
@@ -21,7 +27,7 @@ module.exports = function ({ Users, Threads, Currencies }) {
                 setting2.threadInfo = dataThread
                 setting2.data = {}
                 await Threads.setData(threadID, setting2);
-                for (singleData of threadIn4.userInfo) {
+                for (const singleData of (threadIn4.userInfo || [])) {
                     userName.set(String(singleData.id), singleData.name);
                     try {
                         global.data.allUserID.includes(String(singleData.id)) ? (await Users.setData(String(singleData.id), 
