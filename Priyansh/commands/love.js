@@ -1,232 +1,80 @@
 module.exports.config = {
     name: "love",
-    version: "3.0.0",
+    version: "2.6.0",
     hasPermssion: 0,
-    credits: "Tarek Sarker",
-    description: "Love banner with mentioned user",
+    credits: "𝐏𝐫𝐢𝐲𝐚𝐧𝐬𝐡 𝐑𝐚𝐣𝐩𝐮𝐭",
+    description: "",
     commandCategory: "Love",
-    usages: "/love @mention অথবা reply",
+    usages: "[tag]",
     cooldowns: 5,
     dependencies: {
         "axios": "",
         "fs-extra": "",
         "path": "",
-        "canvas": ""
+        "jimp": ""
     }
 };
 
-const axios = require("axios");
-const fs = require("fs-extra");
-const path = require("path");
-const { createCanvas, loadImage } = require("canvas");
+module.exports.onLoad = async() => {
+    const { resolve } = global.nodemodule["path"];
+    const { existsSync, mkdirSync } = global.nodemodule["fs-extra"];
+    const { downloadFile } = global.utils;
+    const dirMaterial = __dirname + `/cache/canvas/`;
+    const path = resolve(__dirname, 'cache/canvas', 'love2.jpg');
+    if (!existsSync(dirMaterial + "canvas")) mkdirSync(dirMaterial, { recursive: true });
+    if (!existsSync(path)) await downloadFile("https://i.imgur.com/JTvb5yc.png", path);
+}
 
-const TEMPLATE_URL = "https://i.imgur.com/iWnk0rs.jpeg";
+async function makeImage({ one, two }) {
+    const fs = global.nodemodule["fs-extra"];
+    const path = global.nodemodule["path"];
+    const axios = global.nodemodule["axios"]; 
+    const jimp = global.nodemodule["jimp"];
+    const __root = path.resolve(__dirname, "cache", "canvas");
 
-const REF_W = 1774;
-const REF_H = 887;
+    let tromcho_img = await jimp.read(__root + "/love2.jpg");
+    let pathImg = __root + `/love2_${one}_${two}.png`;
+    let avatarOne = __root + `/avt_${one}.png`;
+    let avatarTwo = __root + `/avt_${two}.png`;
+    
+    let getAvatarOne = (await axios.get(`https://graph.facebook.com/${one}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`, { responseType: 'arraybuffer' })).data;
+    fs.writeFileSync(avatarOne, Buffer.from(getAvatarOne, 'utf-8'));
+    
+    let getAvatarTwo = (await axios.get(`https://graph.facebook.com/${two}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`, { responseType: 'arraybuffer' })).data;
+    fs.writeFileSync(avatarTwo, Buffer.from(getAvatarTwo, 'utf-8'));
+    
+    let circleOne = await jimp.read(await circle(avatarOne));
+    let circleTwo = await jimp.read(await circle(avatarTwo));
+    tromcho_img.composite(circleOne.resize(270, 270), 800, 100).composite(circleTwo.resize(300, 300), 205, 300);
+    
+    let raw = await tromcho_img.getBufferAsync("image/png");
+    
+    fs.writeFileSync(pathImg, raw);
+    fs.unlinkSync(avatarOne);
+    fs.unlinkSync(avatarTwo);
+    
+    return pathImg;
+}
+async function circle(image) {
+    const jimp = require("jimp");
+    image = await jimp.read(image);
+    image.circle();
+    return await image.getBufferAsync("image/png");
+}
 
-// দুইজনের ছবি বসানোর স্থান
-const LEFT = { x: 407, y: 391, rx: 211, ry: 199 };
-const RIGHT = { x: 1387, y: 399, rx: 224, ry: 199 };
-
-const CREDIT = "Tarek Sarker";
-
-const LOVE_MESSAGES = [
-    "💖 তোমাদের দুজনের ভালোবাসা চিরদিন অটুট থাকুক! ❤️",
-    "🥰 প্রেম হোক সুন্দর, বিশ্বাস হোক আরও গভীর! 💕",
-    "💘 একজন আরেকজনের হাসির কারণ হয়ে থেকো! 🌹",
-    "😍 তোমাদের জুটি একদম আগুন! 🔥❤️",
-    "🫶 ভালোবাসা থাকুক হৃদয়ের গভীরে, সারাজীবন! 💞",
-    "🌹 দুজনের গল্পটা হোক পৃথিবীর সবচেয়ে সুন্দর গল্প! 💖",
-    "💓 চোখে চোখে ভালোবাসা, মনে মনে হাজার স্বপ্ন! ✨",
-    "😘 তোমাদের জুটির জন্য রইল এক আকাশ ভালোবাসা! 💗"
-];
-
-module.exports.run = async function ({ event, api }) {
+module.exports.run = async function ({ event, api, args }) {
+    const fs = global.nodemodule["fs-extra"];
     const { threadID, messageID, senderID } = event;
-
-    // besti কমান্ডের মতো মেনশন শনাক্ত করা
-    const mentions = event.mentions || {};
-    const mentionIDs = Object.keys(mentions);
-
-    let targetID = null;
-
-    if (mentionIDs.length > 0) {
-        targetID = mentionIDs[0];
-    } else if (event.messageReply && event.messageReply.senderID) {
-        targetID = event.messageReply.senderID;
+    var mention = Object.keys(event.mentions || {})[0]
+    if (!mention) return api.sendMessage("Please tag 1 person", threadID, messageID);
+    let tag = String(event.mentions[mention]).replace("@", "");
+    {
+        var one = senderID, two = mention;
+        return makeImage({ one, two }).then(path => api.sendMessage({ body: "This "  +  tag + ' love you so much💔',
+            mentions: [{
+          tag: tag,
+          id: mention
+        }],
+     attachment: fs.createReadStream(path) }, threadID, () => fs.unlinkSync(path), messageID));
     }
-
-    if (!targetID) {
-        return api.sendMessage(
-            "⚠️ একজনকে মেনশন দাও অথবা কারও মেসেজে Reply দিয়ে /love লেখো! ❤️",
-            threadID,
-            messageID
-        );
-    }
-
-    if (String(targetID) === String(senderID)) {
-        return api.sendMessage(
-            "😂 নিজেকেই Love করছো! অন্য কাউকে মেনশন দাও ❤️",
-            threadID,
-            messageID
-        );
-    }
-
-    const cacheDir = path.join(__dirname, "cache");
-    fs.ensureDirSync(cacheDir);
-
-    const unique = `${senderID}_${targetID}_${Date.now()}`;
-    const templatePath = path.join(cacheDir, "love_template.jpg");
-    const outputPath = path.join(cacheDir, `love_${unique}.png`);
-
-    const avatarPaths = [
-        path.join(cacheDir, `love_avt1_${unique}.jpg`),
-        path.join(cacheDir, `love_avt2_${unique}.jpg`)
-    ];
-
-    try {
-        // ব্যানার ডাউনলোড
-        if (!fs.existsSync(templatePath)) {
-            const response = await axios.get(TEMPLATE_URL, {
-                responseType: "arraybuffer",
-                timeout: 30000
-            });
-
-            fs.writeFileSync(templatePath, Buffer.from(response.data));
-        }
-
-        const avatarURL = uid =>
-            `https://graph.facebook.com/${uid}/picture?width=720&height=720`;
-
-        const [template, avatar1Response, avatar2Response] =
-            await Promise.all([
-                loadImage(templatePath),
-                axios.get(avatarURL(senderID), {
-                    responseType: "arraybuffer",
-                    timeout: 20000
-                }),
-                axios.get(avatarURL(targetID), {
-                    responseType: "arraybuffer",
-                    timeout: 20000
-                })
-            ]);
-
-        fs.writeFileSync(avatarPaths[0], Buffer.from(avatar1Response.data));
-        fs.writeFileSync(avatarPaths[1], Buffer.from(avatar2Response.data));
-
-        const [avatar1, avatar2] = await Promise.all([
-            loadImage(avatarPaths[0]),
-            loadImage(avatarPaths[1])
-        ]);
-
-        const W = template.width;
-        const H = template.height;
-        const sx = W / REF_W;
-        const sy = H / REF_H;
-
-        const canvas = createCanvas(W, H);
-        const ctx = canvas.getContext("2d");
-
-        ctx.drawImage(template, 0, 0, W, H);
-
-        function drawAvatar(img, frame) {
-            const cx = frame.x * sx;
-            const cy = frame.y * sy;
-            const rx = frame.rx * sx;
-            const ry = frame.ry * sy;
-
-            const size = Math.max(rx * 2, ry * 2);
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-            ctx.clip();
-
-            // ছবিকে ফ্রেমে ফিট করা
-            const scale = Math.max(
-                (rx * 2) / img.width,
-                (ry * 2) / img.height
-            );
-
-            const dw = img.width * scale;
-            const dh = img.height * scale;
-
-            ctx.drawImage(
-                img,
-                cx - dw / 2,
-                cy - dh / 2,
-                dw,
-                dh
-            );
-
-            ctx.restore();
-        }
-
-        drawAvatar(avatar1, LEFT);
-        drawAvatar(avatar2, RIGHT);
-
-        fs.writeFileSync(outputPath, canvas.toBuffer("image/png"));
-
-        let senderName = "তুমি";
-        let targetName = "প্রিয় মানুষ";
-
-        try {
-            const info = await api.getUserInfo([senderID, targetID]);
-            senderName = info[senderID]?.name || senderName;
-            targetName = info[targetID]?.name || targetName;
-        } catch (_) {}
-
-        const tag1 = `@${senderName}`;
-        const tag2 = `@${targetName}`;
-
-        const message =
-`╔════════════════════╗
-       💖 𝐋𝐎𝐕𝐄 𝐌𝐀𝐓𝐂𝐇 💖
-╚════════════════════╝
-
-👤 ${tag1}
-❤️ ${tag2}
-
-${LOVE_MESSAGES[Math.floor(Math.random() * LOVE_MESSAGES.length)]}
-
-💞 ভালোবাসা থাকুক সারাজীবন! 💞
-
-━━━━━━━━━━━━━━━━━━
-🪪 Credit: ${CREDIT}
-━━━━━━━━━━━━━━━━━━`;
-
-        return api.sendMessage(
-            {
-                body: message,
-                mentions: [
-                    { tag: tag1, id: senderID },
-                    { tag: tag2, id: targetID }
-                ],
-                attachment: fs.createReadStream(outputPath)
-            },
-            threadID,
-            err => {
-                for (const file of [...avatarPaths, outputPath]) {
-                    fs.remove(file).catch(() => {});
-                }
-
-                if (err) console.error("LOVE SEND ERROR:", err);
-            },
-            messageID
-        );
-    } catch (error) {
-        console.error("LOVE COMMAND ERROR:", error.stack || error);
-
-        for (const file of [...avatarPaths, outputPath]) {
-            fs.remove(file).catch(() => {});
-        }
-
-        return api.sendMessage(
-            "❌ Love ব্যানার তৈরি হয়নি!\nসমস্যা: " +
-            (error.response?.status || error.message),
-            threadID,
-            messageID
-        );
-    }
-};
+}
