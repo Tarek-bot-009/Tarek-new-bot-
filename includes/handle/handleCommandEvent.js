@@ -37,9 +37,9 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
                 Obj.Threads = Threads;
                 Obj.Currencies = Currencies;
                 Obj.getText = getText2;
-                if (cmd && typeof cmd.handleEvent === 'function') Promise.resolve(cmd.handleEvent(Obj)).catch(e => console.log('[handleEvent error]', cmd.config.name, e && e.message || e));
+                if (cmd) cmd.handleEvent(Obj);
             } catch (error) {
-                console.log('[handleEvent error]', cmd && cmd.config && cmd.config.name, error && error.message || error);
+                logger(global.getText('handleCommandEvent', 'moduleError', cmd.config.name), 'error');
             }
         }
     };
