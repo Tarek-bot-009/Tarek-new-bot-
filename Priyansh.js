@@ -139,6 +139,39 @@ function onBot({ models: botModel }) {
     login(loginData, async(loginError, loginApiData) => {
         if (loginError) return logger(JSON.stringify(loginError), `ERROR`);
         loginApiData.setOptions(global.config.FCAOption)
+
+        // ===== সেন্ড ফিক্স: কোনো গ্রুপে মেসেজ পাঠাতে ব্যর্থ হলে এরর দেখাবে + অটো রিট্রাই করবে =====
+        (function patchSendMessage(api) {
+            if (api.__sendPatched) return;
+            api.__sendPatched = true;
+            const origSend = api.sendMessage.bind(api);
+            api.sendMessage = function (msg, threadID, callback, replyMessageID, isGroup) {
+                // তৃতীয় প্যারামিটারে messageID দিলে সেটাকে রিপ্লাই আইডি ধরা
+                if (typeof callback === 'string' || typeof callback === 'number') {
+                    isGroup = replyMessageID; replyMessageID = String(callback); callback = undefined;
+                }
+                if (typeof callback !== 'function') callback = undefined;
+                const done = (err, info) => { if (callback) { try { callback(err, info); } catch (e) { console.log('[sendMessage callback error]', e); } } };
+                const attempt = (n, useReply) => {
+                    const args = [msg, threadID, (err, info) => {
+                        if (!err) return done(null, info);
+                        console.log(`[SEND FAIL] thread=${threadID} try=${n} :`, (err && (err.errorDescription || err.error || err.message)) || err);
+                        if (n >= 3) return done(err, info);
+                        // ১ম ব্যর্থতা: রিপ্লাই ছাড়া আবার চেষ্টা, ২য় ব্যর্থতা: একটু পর আবার
+                        setTimeout(() => attempt(n + 1, false), n === 1 ? 500 : 2500);
+                    }];
+                    if (useReply && replyMessageID) { args.push(replyMessageID); if (isGroup !== undefined) args.push(isGroup); }
+                    else if (isGroup !== undefined) { args.push(undefined, isGroup); }
+                    try { origSend(...args); }
+                    catch (e) {
+                        console.log('[SEND EXCEPTION]', threadID, e && e.message || e);
+                        if (n >= 3) return done(e);
+                        setTimeout(() => attempt(n + 1, false), 1000);
+                    }
+                };
+                attempt(1, true);
+            };
+        })(loginApiData);
         writeFileSync(appStateFile, JSON.stringify(loginApiData.getAppState(), null, '\x09'))
         global.client.api = loginApiData
         global.config.version = '1.2.14'
@@ -287,30 +320,4 @@ function onBot({ models: botModel }) {
             if (global.config.DeveloperMode == !![]) console.log(message);
             return listener(message);
         };
-        global.handleListen = loginApiData.listenMqtt(listenerCallback);
-        try {
-            await checkBan(loginApiData);
-        } catch (error) {
-            return //process.exit(0);
-        };
-        if (!global.checkBan) logger(global.getText('priyansh', 'warningSourceCode'), '[ GLOBAL BAN ]');
-    });
-}
-
-//========= Connecting to Database =========//
-
-(async () => {
-    try {
-        await sequelize.authenticate();
-        const authentication = {};
-        authentication.Sequelize = Sequelize;
-        authentication.sequelize = sequelize;
-        const models = require('./includes/database/model')(authentication);
-        logger(global.getText('priyansh', 'successConnectDatabase'), '[ DATABASE ]');
-        const botData = {};
-        botData.models = models
-        onBot(botData);
-    } catch (error) { logger(global.getText('priyansh', 'successConnectDatabase', JSON.stringify(error)), '[ DATABASE ]'); }
-})();
-
-process.on('unhandledRejection', (err, p) => {});
+        global.handleListen = login
