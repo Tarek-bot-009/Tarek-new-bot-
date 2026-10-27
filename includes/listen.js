@@ -316,10 +316,7 @@ module.exports = function ({ api, models }) {
     }
 
     return (event) => {
-        if (event.type == "message" || event.type == "message_reply") {
-            if (typeof event.body !== "string") event.body = "";
-            fixMentions(event);
-        }
+        if (event.type == "message" || event.type == "message_reply") fixMentions(event);
         switch (event.type) {
           case "message":
           case "message_reply":
@@ -341,4 +338,3 @@ module.exports = function ({ api, models }) {
         }
       };
 };
-                        
