@@ -3,7 +3,7 @@ module.exports.config = {
   name: "t",
   version: "1.0.0",
   hasPermssion: 0,
-  credits: "RAHAT KHAN",
+  credits: "Tarek sarker",
   description: "Random Love Ig",
   commandCategory: "media",
   usages: "ig",
