@@ -1,9 +1,3 @@
-};
-module.exports.handleEvent = async function({ api, event }) {
-    try {
-        if (!global.manhG) global.manhG = {};
-        if (!global.manhG.simOff) global.manhG.simOff = new Set;
-        const { threadID, messageID, senderID } = event;
         const body = typeof event.body === "string" ? event.body.trim() : "";
         if (!body) return;
         if (String(senderID) == String(api.getCurrentUserID())) return;
@@ -19,7 +13,13 @@ module.exports.handleEvent = async function({ api, event }) {
         if (error) return console.log("[SIM] API error, thread=" + threadID);
         const ans = data && (data.answer || data.success || data.reply);
         if (!ans || typeof ans !== "string") return;
-        return api.sendMessage(ans, threadID, messageID);
+        return api.sendMessage(ans, threadID, (err) => {
+            if (err) {
+                console.log("[SIM SEND FAIL] thread=" + threadID, (err && (err.errorDescription || err.error || err.message)) || err);
+                // রিপ্লাই ছাড়া সাধারণ মেসেজ হিসেবে আবার চেষ্টা
+                api.sendMessage(ans, threadID, (e2) => { if (e2) console.log("[SIM SEND FAIL 2] thread=" + threadID, (e2 && (e2.errorDescription || e2.error || e2.message)) || e2); });
+            }
+        }, messageID);
     } catch (e) { console.log("[SIM handleEvent error]", e && e.message || e); }
 };
 module.exports.run = async function({ api, event, args }) {
@@ -41,4 +41,4 @@ module.exports.run = async function({ api, event, args }) {
             return ans ? body(String(ans)) : body((data && data.error) || "[ 𝐒𝐈𝐌 ] - কোনো উত্তর পাওয়া যায়নি।");
     }
 };
-                    
+                                                                                                                             
