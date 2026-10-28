@@ -1,3 +1,55 @@
+module.exports.config = {
+    name: "sim",
+    version: "4.3.7",
+    hasPermssion: 0,
+    credits: "𝐏𝐫𝐢𝐲𝐚𝐧𝐬𝐡 𝐑𝐚𝐣𝐩𝐮𝐭",
+    description: "\x43\x68\x61\x74\x20\x77\x69\x74\x68\x20\x73\x69\x6d\x73\x69\x6d\x69\x20\x41\x49\x2e\x20\x46\x69\x78\x65\x64\x20\x62\x79\x20\ud835\udc0f\ud835\udc2b\ud835\udc22\ud835\udc32\ud835\udc1a\ud835\udc27\ud835\udc2c\ud835\udc21\x20\ud835\udc11\ud835\udc1a\ud835\udc23\ud835\udc29\ud835\udc2e\ud835\udc2d",
+    commandCategory: "Chat same sim",
+    usages: "[args]",
+    cooldowns: 5,
+    dependencies: {
+        axios: ""
+    },
+    envConfig: {
+        APIKEY: "Priyansh_1234567890"
+    }
+}
+async function simsimi(a, b, c) {
+    const axios = require("axios");
+    const q = encodeURIComponent(a);
+    const pick = (d) => d && (d.answer || d.success || d.reply || d.message);
+    // 1) main server (retry twice in case it is asleep)
+    for (let i = 0; i < 1; i++) {
+        try {
+            const { data } = await axios.get(`https://sim-a9ek.onrender.com/sim?type=ask&ask=${q}&apikey=PriyanshVip`, { timeout: 7000 });
+            const t = pick(data);
+            if (t && typeof t === "string") return { error: false, data: { answer: t } };
+        } catch (e) {}
+    }
+    // 2) backup server
+    try {
+        const { data } = await axios.post("https://api.simsimi.vn/v1/simtalk", `text=${q}&lc=bn`, { timeout: 4000, headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+        const t = pick(data);
+        if (t && typeof t === "string") return { error: false, data: { answer: t } };
+    } catch (e) {}
+    // 3) built-in replies so the bot never stays silent
+    const replies = [
+        "হ্যাঁ বলো, শুনছি 🙂", "আরে বাহ! তারপর? 😄", "হুম, বুঝলাম 😊",
+        "আমি তো এখানেই আছি 😎", "কী বলো তো! 😂", "ঠিক বলেছ 👍",
+        "আরও বলো, শুনতে ভালো লাগছে ❤️", "হাহা, মজার কথা বললে 😆"
+    ];
+    return { error: false, data: { answer: replies[Math.floor(Math.random() * replies.length)] } };
+}
+module.exports.onLoad = async function() {
+    "undefined" == typeof global.manhG && (global.manhG = {});
+    // এখন সব গ্রুপে ডিফল্ট চালু; শুধু যে গ্রুপে "sim off" দেওয়া হবে সেখানে বন্ধ থাকবে
+    "undefined" == typeof global.manhG.simOff && (global.manhG.simOff = new Set);
+};
+module.exports.handleEvent = async function({ api, event }) {
+    try {
+        if (!global.manhG) global.manhG = {};
+        if (!global.manhG.simOff) global.manhG.simOff = new Set;
+        const { threadID, messageID, senderID } = event;
         const body = typeof event.body === "string" ? event.body.trim() : "";
         if (!body) return;
         if (String(senderID) == String(api.getCurrentUserID())) return;
@@ -41,4 +93,3 @@ module.exports.run = async function({ api, event, args }) {
             return ans ? body(String(ans)) : body((data && data.error) || "[ 𝐒𝐈𝐌 ] - কোনো উত্তর পাওয়া যায়নি।");
     }
 };
-                                                                                                                             
