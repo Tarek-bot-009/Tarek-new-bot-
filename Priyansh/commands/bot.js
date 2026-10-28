@@ -91,23 +91,23 @@ module.exports.handleEvent = async function({ api, event, args, Threads, Users }
      return api.sendMessage("সরি বস মাফ করে দেন আর এমন ভুল হবে না🥺🙏", threadID);
    };
 
-   if ((event.body.toLowerCase() == "Nusrat Nur") || (event.body.toLowerCase() == "@Nusrat Nur ")) {
-     return api.sendMessage("খবরদার কেউ এই আইডি মেনশন দিবানা এটা আমার বস তারেক সরকার এর বউ এর আইডি😠🥰⛏️", threadID);
+   if ((event.body.toLowerCase() == "lamiya") || (event.body.toLowerCase() == "@Nusrat Nur ")) {
+     return api.sendMessage("খবরদার কেউ এই আইডি মেনশন দিবানা এটা আমার বস তারেক এর গফ🥰⛏️", threadID);
    };
 
   if ((event.body.toLowerCase() == "Nova") || (event.body.toLowerCase() == "nova")) {
      return api.sendMessage("সাবধান এটা হলিউডের নায়িকা পাওয়ারি অন্য রকম ঢং করার জন্য সেরা রে..!😹🍊⛏️", threadID);
    };
   
-  if ((event.body.toLowerCase() == "arvi") || (event.body.toLowerCase() == "Arvi")) {
+  if ((event.body.toLowerCase() == "aru") || (event.body.toLowerCase() == "Arvi")) {
      return api.sendMessage("ছি এই নাম ধরে ডাক দেইছ না এইটা 12 ঘাটের পানি খাই..!😠🥰⛏️", threadID);
    };
 
-  if ((event.body.toLowerCase() == "Nusrat") || (event.body.toLowerCase() == "nusrat")) {
+  if ((event.body.toLowerCase() == "lamiya") || (event.body.toLowerCase() == "nusrat")) {
      return api.sendMessage("খবরদার কেউ এই নাম দরে ডাক দিবানা এটা আমার বস তারেক সরকার এর বউ এর নাম..!😠🥰⛏️", threadID);
    };
 
-  if ((event.body.toLowerCase() == "Emon") || (event.body.toLowerCase() == "emon")) {
+  if ((event.body.toLowerCase() == "Munna") || (event.body.toLowerCase() == "emon")) {
      return api.sendMessage("🥰-ইমন-🌺 আমার বস তারেক সরকার এর বন্ধু লাগে লুচ্ছি বেডি'রা দূরে থাক😠🥰⛏️", threadID);
    };
 
@@ -168,7 +168,7 @@ module.exports.handleEvent = async function({ api, event, args, Threads, Users }
    };
 
    if ((event.body.toLowerCase() == "🥰") || (event.body.toLowerCase() == "😍") || (event.body.toLowerCase() == "😻") || (event.body.toLowerCase() == "❤️")) {
-     return api.sendMessage("ভালোবাসা নামক আবলামী করতে চাইলে  ইনবক্সে চলে যা পাগল ছাগল🌚🐸🌶️🍆", threadID);
+     return api.sendMessage("ভালোবাসা নামক আবলামী করতে চাইলে আমার বস তারেক সরকার এর ইনবক্সে চলে যা পাগল ছাগল🌚🐸🌶️🍆", threadID);
    };
 
    if ((event.body.toLowerCase() == "Kemon aso") || (event.body.toLowerCase() == "Kemon asen") || (event.body.toLowerCase() == "Kmon acho") || (event.body.toLowerCase() == "how are you") || (event.body.toLowerCase() == "how are you?")) {
