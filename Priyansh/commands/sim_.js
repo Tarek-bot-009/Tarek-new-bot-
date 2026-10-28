@@ -1,9 +1,9 @@
 module.exports.config = {
     name: "sim",
-    version: "4.3.7",
+    version: "4.3.8",
     hasPermssion: 0,
-    credits: "𝐏𝐫𝐢𝐲𝐚𝐧𝐬𝐡 𝐑𝐚𝐣𝐩𝐮𝐭",
-    description: "\x43\x68\x61\x74\x20\x77\x69\x74\x68\x20\x73\x69\x6d\x73\x69\x6d\x69\x20\x41\x49\x2e\x20\x46\x69\x78\x65\x64\x20\x62\x79\x20\ud835\udc0f\ud835\udc2b\ud835\udc22\ud835\udc32\ud835\udc1a\ud835\udc27\ud835\udc2c\ud835\udc21\x20\ud835\udc11\ud835\udc1a\ud835\udc23\ud835\udc29\ud835\udc2e\ud835\udc2d",
+    credits: "Priyansh Rajput",
+    description: "Chat with simsimi AI (all groups by default)",
     commandCategory: "Chat same sim",
     usages: "[args]",
     cooldowns: 5,
@@ -16,7 +16,6 @@ module.exports.config = {
 }
 async function simsimi(a, b, c) {
     const axios = require("axios"),
-        { APIKEY } = global.configModule.sim,
         g = (a) => encodeURIComponent(a);
     try {
         var { data: j } = await axios({ url: `https://sim-a9ek.onrender.com/sim?type=ask&ask=${g(a)}&apikey=PriyanshVip`, method: "GET" });
@@ -26,26 +25,46 @@ async function simsimi(a, b, c) {
     }
 }
 module.exports.onLoad = async function() {
-    "undefined" == typeof global.manhG && (global.manhG = {}), "undefined" == typeof global.manhG.simsimi && (global.manhG.simsimi = new Map);
+    "undefined" == typeof global.manhG && (global.manhG = {});
+    "undefined" == typeof global.manhG.simOff && (global.manhG.simOff = new Set);
 };
 module.exports.handleEvent = async function({ api, event }) {
-    const { threadID, messageID, senderID, body } = event, g = (senderID) => api.sendMessage(senderID, threadID, messageID);
-    if (global.manhG.simsimi.has(threadID)) {
-        if (senderID == api.getCurrentUserID() || "" == body || messageID == global.manhG.simsimi.get(threadID)) return;
+    try {
+        if (!global.manhG) global.manhG = {};
+        if (!global.manhG.simOff) global.manhG.simOff = new Set;
+        const { threadID, messageID, senderID } = event;
+        const body = typeof event.body === "string" ? event.body.trim() : "";
+        if (!body) return;
+        if (String(senderID) == String(api.getCurrentUserID())) return;
+        if (global.manhG.simOff.has(String(threadID))) return;
+        const ts = global.data.threadData.get(String(threadID)) || {};
+        const prefix = ts.PREFIX || global.config.PREFIX;
+        if (prefix && body.indexOf(prefix) == 0) return;
+        const low = body.toLowerCase();
+        if (["bot", "robot", "baby", "bby", "janu"].some(w => low.startsWith(w))) return;
         var { data, error } = await simsimi(body, api, event);
-        return !0 == error ? void 0 : !1 == data.answer ? g(data.error) : g(data.answer)
-    }
-}
+        if (error) return console.log("[SIM] API error, thread=" + threadID);
+        const ans = data && (data.answer || data.success || data.reply);
+        if (!ans || typeof ans !== "string") return;
+        return api.sendMessage(ans, threadID, messageID);
+    } catch (e) { console.log("[SIM handleEvent error]", e && e.message || e); }
+};
 module.exports.run = async function({ api, event, args }) {
-    const { threadID, messageID } = event, body = (args) => api.sendMessage(args, threadID, messageID);
-    if (0 == args.length) return body("[ 𝐒𝐈𝐌 ] - You haven't entered a message yet.");
+    if (!global.manhG) global.manhG = {};
+    if (!global.manhG.simOff) global.manhG.simOff = new Set;
+    const { threadID, messageID } = event, tid = String(threadID), body = (a) => api.sendMessage(a, threadID, messageID);
+    if (0 == args.length) return body("[ SIM ] - You haven't entered a message yet.");
     switch (args[0]) {
         case "on":
-            return global.manhG.simsimi.has(threadID) ? body("[ 𝐒𝐈𝐌 ] - What happened after 2 times?") : (global.manhG.simsimi.set(threadID, messageID), body("[ 𝐒𝐈𝐌 ] - Make it successful."));
+            global.manhG.simOff.delete(tid);
+            return body("[ SIM ] - এই গ্রুপে সিম চালু হয়েছে।");
         case "off":
-            return global.manhG.simsimi.has(threadID) ? (global.manhG.simsimi.delete(threadID), body("[ 𝐒𝐈𝐌 ] - easy success.")) : body("[ 𝐒𝐈𝐌 ] - Tao is starting to turn off.");
+            global.manhG.simOff.add(tid);
+            return body("[ SIM ] - এই গ্রুপে সিম বন্ধ হয়েছে।");
         default:
             var { data, error } = await simsimi(args.join(" "), api, event);
-            return !0 == data ? void 0 : !1 == data.answer ? body(data.error) : body(data.answer);
+            if (error) return body("[ SIM ] - সার্ভার সমস্যা, পরে চেষ্টা করুন।");
+            const ans = data && (data.answer || data.success || data.reply);
+            return ans ? body(String(ans)) : body((data && data.error) || "[ SIM ] - কোনো উত্তর পাওয়া যায়নি।");
     }
 };
