@@ -3,7 +3,7 @@ const { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync, rm } =
 const { join, resolve } = require("path");
 const { execSync } = require('child_process');
 const logger = require("./utils/log.js");
-const login = require("sfca-priyansh"); // আগে ছিল: fca-priyansh (ফিরে যেতে চাইলে এখানে আবার "fca-priyansh" লিখো) 
+const login = require("fca-priyansh"); 
 const axios = require("axios");
 const listPackage = JSON.parse(readFileSync('./package.json')).dependencies;
 const listbuiltinModules = require("module").builtinModules;
@@ -136,9 +136,9 @@ catch { return logger.loader(global.getText("priyansh", "notFoundPathAppstate"),
 function onBot({ models: botModel }) {
     const loginData = {};
     loginData['appState'] = appState;
-    login(loginData, Object.assign({}, global.config.FCAOption || {}), async(loginError, loginApiData) => {
+    login(loginData, async(loginError, loginApiData) => {
         if (loginError) return logger(JSON.stringify(loginError), `ERROR`);
-        if (typeof loginApiData.setOptions === 'function') loginApiData.setOptions(global.config.FCAOption)
+        loginApiData.setOptions(global.config.FCAOption)
         writeFileSync(appStateFile, JSON.stringify(loginApiData.getAppState(), null, '\x09'))
         global.client.api = loginApiData
         global.config.version = '1.2.14'
@@ -313,5 +313,4 @@ function onBot({ models: botModel }) {
     } catch (error) { logger(global.getText('priyansh', 'successConnectDatabase', JSON.stringify(error)), '[ DATABASE ]'); }
 })();
 
-process.on('unhandledRejection', (err, p) => { try { console.log('[unhandledRejection]', (err && err.message) || err); } catch (e) {} });
-                                
+process.on('unhandledRejection', (err, p) => {});
