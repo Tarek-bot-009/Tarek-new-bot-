@@ -36,7 +36,9 @@ async function simsimi(a, b, c) {
     const replies = [
         "হ্যাঁ বলো, শুনছি 🙂", "আরে বাহ! তারপর? 😄", "হুম, বুঝলাম 😊",
         "আমি তো এখানেই আছি 😎", "কী বলো তো! 😂", "ঠিক বলেছ 👍",
-        "আরও বলো, শুনতে ভালো লাগছে ❤️", "হাহা, মজার কথা বললে 😆"
+        "আরও বলো, শুনতে ভালো লাগছে ❤️", "হাহা, মজার কথা বললে 😆",
+        "সত্যিই? 😮", "তাই নাকি! 😲", "ওহ আচ্ছা 🙂", "বাহ, ভালো তো 👌",
+        "হুম হুম 😌", "মজা পাচ্ছি 😁", "আর কী খবর? 😊", "আমিও তাই ভাবছিলাম 🤔"
     ];
     return { error: false, data: { answer: replies[Math.floor(Math.random() * replies.length)] } };
 }
@@ -49,29 +51,46 @@ module.exports.handleEvent = async function({ api, event }) {
     try {
         if (!global.manhG) global.manhG = {};
         if (!global.manhG.simOff) global.manhG.simOff = new Set;
+        if (!global.manhG.simLast) global.manhG.simLast = new Map;   // প্রতি গ্রুপে শেষ উত্তরের সময়
+        if (!global.manhG.simPause) global.manhG.simPause = new Map; // ব্লক হলে বিরতি
         const { threadID, messageID, senderID } = event;
+        const tid = String(threadID);
         const body = typeof event.body === "string" ? event.body.trim() : "";
-        if (!body) return;
+        if (body.length < 3) return;
         if (String(senderID) == String(api.getCurrentUserID())) return;
-        if (global.manhG.simOff.has(String(threadID))) return;
-        // কমান্ড (প্রিফিক্স) হলে সিম উত্তর দেবে না
-        const ts = (global.data.threadData.get(String(threadID)) || {});
+        if (global.manhG.simOff.has(tid)) return;
+        const now = Date.now();
+        // Facebook ব্লক করলে ৫ মিনিট ওই গ্রুপে বিরতি
+        if ((global.manhG.simPause.get(tid) || 0) > now) return;
+        // স্প্যাম এড়াতে প্রতি গ্রুপে ৫ সেকেন্ডে সর্বোচ্চ ১টি উত্তর
+        if (now - (global.manhG.simLast.get(tid) || 0) < 5000) return;
+        const ts = global.data.threadData.get(tid) || {};
         const prefix = ts.PREFIX || global.config.PREFIX;
         if (prefix && body.indexOf(prefix) == 0) return;
-        // অন্য চ্যাট মডিউল যেসব শব্দ দিয়ে শুরু হলে নিজে উত্তর দেয়, সেখানে ডাবল রিপ্লাই এড়ানো
         const low = body.toLowerCase();
         if (["bot", "robot", "baby", "bby", "janu"].some(w => low.startsWith(w))) return;
+        global.manhG.simLast.set(tid, now);
         var { data, error } = await simsimi(body, api, event);
         if (error) return console.log("[SIM] API error, thread=" + threadID);
         const ans = data && (data.answer || data.success || data.reply);
         if (!ans || typeof ans !== "string") return;
-        return api.sendMessage(ans, threadID, (err) => {
-            if (err) {
-                console.log("[SIM SEND FAIL] thread=" + threadID, (err && (err.errorDescription || err.error || err.message)) || err);
-                // রিপ্লাই ছাড়া সাধারণ মেসেজ হিসেবে আবার চেষ্টা
-                api.sendMessage(ans, threadID, (e2) => { if (e2) console.log("[SIM SEND FAIL 2] thread=" + threadID, (e2 && (e2.errorDescription || e2.error || e2.message)) || e2); });
-            }
-        }, messageID);
+        // মানুষের মতো একটু দেরিতে পাঠানো (২-৪ সেকেন্ড)
+        await new Promise(r => setTimeout(r, 1000 + Math.floor(Math.random() * 1500)));
+        const send = (n) => {
+            const cb = (err) => {
+                if (!err) { global.manhG.simLast.set(tid, Date.now()); return; }
+                console.log("[SIM SEND FAIL] try=" + n + " thread=" + threadID, (err && (err.errorDescription || err.error || err.message)) || err);
+                if (n >= 3) {
+                    global.manhG.simPause.set(tid, Date.now() + 2 * 60 * 1000);
+                    return console.log("[SIM] thread=" + threadID + " ২ মিনিট বিরতি");
+                }
+                setTimeout(() => send(n + 1), n === 1 ? 4000 : 12000);
+            };
+            // ১ম ও ২য় চেষ্টায় মেসেজে রিপ্লাই দিয়ে, শেষ চেষ্টায় রিপ্লাই ছাড়া
+            if (n <= 2) api.sendMessage(ans, threadID, cb, messageID);
+            else api.sendMessage(ans, threadID, cb);
+        };
+        send(1);
     } catch (e) { console.log("[SIM handleEvent error]", e && e.message || e); }
 };
 module.exports.run = async function({ api, event, args }) {
@@ -93,3 +112,4 @@ module.exports.run = async function({ api, event, args }) {
             return ans ? body(String(ans)) : body((data && data.error) || "[ 𝐒𝐈𝐌 ] - কোনো উত্তর পাওয়া যায়নি।");
     }
 };
+    
