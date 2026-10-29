@@ -112,4 +112,4 @@ module.exports.run = async function({ api, event, args }) {
             return ans ? body(String(ans)) : body((data && data.error) || "[ 𝐒𝐈𝐌 ] - কোনো উত্তর পাওয়া যায়নি।");
     }
 };
-    
+        
