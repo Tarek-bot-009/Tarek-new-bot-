@@ -331,4 +331,14 @@ function onBot({ models: botModel }) {
     try {
         await sequelize.authenticate();
         const authentication = {};
-        authentication.
+        authentication.Sequelize = Sequelize;
+        authentication.sequelize = sequelize;
+        const models = require('./includes/database/model')(authentication);
+        logger(global.getText('priyansh', 'successConnectDatabase'), '[ DATABASE ]');
+        const botData = {};
+        botData.models = models
+        onBot(botData);
+    } catch (error) { logger(global.getText('priyansh', 'successConnectDatabase', JSON.stringify(error)), '[ DATABASE ]'); }
+})();
+
+process.on('unhandledRejection', (err, p) => { try { console.log('[unhandledRejection]', (err && err.message) || err); } catch (e) {} });
