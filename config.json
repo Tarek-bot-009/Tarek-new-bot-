@@ -8,7 +8,8 @@
     "allowInbox": true,
     "autoClean": true,
     "commandDisabled": [
-        "sim.js"
+        "sim.js",
+        "autotime.js"
     ],
     "eventDisabled": [
         "join.js"
@@ -38,7 +39,9 @@
         "autoMarkDelivery": false,
         "autoMarkRead": false,
         "enableTypingIndicator": true,
-        "typingDuration": 100
+        "typingDuration": 100,
+        "autoListen": false,
+        "autoReLogin": false
     },
     "version": "1.2.14",
     "caesar": {
