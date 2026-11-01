@@ -3,7 +3,34 @@ const { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync, rm } =
 const { join, resolve } = require("path");
 const { execSync } = require('child_process');
 const logger = require("./utils/log.js");
-const login = require("fca-priyansh"); 
+const login = require("sahu-fca"); // ফেসবুক লাইব্রেরি (আগে: fca-priyansh)
+
+// নতুন লাইব্রেরির সাথে পুরোনো কোডের মিল রাখার ছোট অ্যাডাপ্টার
+function normalizeApi(api) {
+    if (!api || typeof api !== "object" || api.__normalized) return api;
+    api.__normalized = true;
+    if (typeof api.listenMqtt !== "function" && typeof api.listen === "function") {
+        api.listenMqtt = function (callback) { return api.listen(callback); };
+    }
+    if (typeof api.setOptions !== "function") api.setOptions = function () {};
+    if (typeof api.getAppState !== "function") api.getAppState = function () { return null; };
+    if (typeof api.listenMqtt === "function") {
+        const original = api.listenMqtt;
+        api.listenMqtt = function (callback) {
+            const handle = original.call(api, callback);
+            const noop = () => {};
+            if (typeof handle === "function") { handle.stop = handle.stopListening = handle.end = handle.close = handle; return handle; }
+            if (handle && typeof handle === "object") {
+                const stopper = handle.stopListening || handle.stop || handle.end || handle.close || noop;
+                handle.stop = handle.stop || stopper; handle.stopListening = handle.stopListening || stopper;
+                handle.end = handle.end || stopper; handle.close = handle.close || stopper;
+                return handle;
+            }
+            return { stop: noop, stopListening: noop, end: noop, close: noop };
+        };
+    }
+    return api;
+} 
 const axios = require("axios");
 const listPackage = JSON.parse(readFileSync('./package.json')).dependencies;
 const listbuiltinModules = require("module").builtinModules;
@@ -136,10 +163,11 @@ catch { return logger.loader(global.getText("priyansh", "notFoundPathAppstate"),
 function onBot({ models: botModel }) {
     const loginData = {};
     loginData['appState'] = appState;
-    login(loginData, async(loginError, loginApiData) => {
+    login(loginData, Object.assign({}, global.config.FCAOption || {}), async(loginError, loginApiData) => {
         if (loginError) return logger(JSON.stringify(loginError), `ERROR`);
-        loginApiData.setOptions(global.config.FCAOption)
-        writeFileSync(appStateFile, JSON.stringify(loginApiData.getAppState(), null, '\x09'))
+        loginApiData = normalizeApi(loginApiData);
+        try { loginApiData.setOptions(global.config.FCAOption) } catch (e) {}
+        { const _st = loginApiData.getAppState(); if (Array.isArray(_st) && _st.length) writeFileSync(appStateFile, JSON.stringify(_st, null, '\x09')); }
         global.client.api = loginApiData
         global.config.version = '1.2.14'
         global.client.timeStart = new Date().getTime(),
@@ -303,14 +331,4 @@ function onBot({ models: botModel }) {
     try {
         await sequelize.authenticate();
         const authentication = {};
-        authentication.Sequelize = Sequelize;
-        authentication.sequelize = sequelize;
-        const models = require('./includes/database/model')(authentication);
-        logger(global.getText('priyansh', 'successConnectDatabase'), '[ DATABASE ]');
-        const botData = {};
-        botData.models = models
-        onBot(botData);
-    } catch (error) { logger(global.getText('priyansh', 'successConnectDatabase', JSON.stringify(error)), '[ DATABASE ]'); }
-})();
-
-process.on('unhandledRejection', (err, p) => {});
+        authentication.
