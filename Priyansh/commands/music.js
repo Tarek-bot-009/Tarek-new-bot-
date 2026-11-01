@@ -1,106 +1,116 @@
-const fetch = require("node-fetch");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 const ytSearch = require("yt-search");
 
+const MAX_BYTES = 25 * 1024 * 1024; // মেসেঞ্জারে পাঠানোর সীমা ~25MB
+
+function loadYtdl() {
+  for (const m of ["@distube/ytdl-core", "ytdl-core"]) {
+    try { return require(m); } catch (e) {}
+  }
+  return null;
+}
+
+// ১) আগের API দিয়ে চেষ্টা
+async function downloadViaApi(videoId, type, file) {
+  const apiUrl = `https://priyansh-ai.onrender.com/youtube?id=${videoId}&type=${type}&apikey=priyansh-here`;
+  const r = await axios.get(apiUrl, { timeout: 20000 });
+  const downloadUrl = r.data && r.data.downloadUrl;
+  if (!downloadUrl) throw new Error("API থেকে ডাউনলোড লিংক পাওয়া যায়নি");
+  const res = await axios.get(downloadUrl, { responseType: "arraybuffer", timeout: 120000, maxContentLength: MAX_BYTES * 2 });
+  fs.writeFileSync(file, Buffer.from(res.data));
+}
+
+// ২) API কাজ না করলে সরাসরি YouTube থেকে
+async function downloadViaYtdl(videoUrl, type, file) {
+  const ytdl = loadYtdl();
+  if (!ytdl) throw new Error("ytdl-core প্যাকেজ নেই");
+  await new Promise((resolve, reject) => {
+    const opts = type === "audio"
+      ? { filter: "audioonly", quality: "highestaudio", highWaterMark: 1 << 25 }
+      : { quality: "18", highWaterMark: 1 << 25 }; // 360p ভিডিও (ছোট সাইজ)
+    const stream = ytdl(videoUrl, opts);
+    const out = fs.createWriteStream(file);
+    stream.on("error", reject);
+    out.on("error", reject);
+    out.on("finish", resolve);
+    stream.pipe(out);
+  });
+}
+
 module.exports = {
   config: {
     name: "music",
-    version: "1.0.1",
+    version: "2.0.0",
     hasPermssion: 0,
-    credits: "𝐏𝐫𝐢𝐲𝐚𝐧𝐬𝐡 𝐑𝐚𝐣𝐩𝐮𝐭",
-    description: "Download YouTube song from keyword search and link",
+    credits: "𝐏𝐫𝐢𝐲𝐚𝐧𝐬𝐡 𝐑𝐚𝐣𝐩𝐮𝐭 (fixed)",
+    description: "Download YouTube song from keyword search",
     commandCategory: "Media",
-    usages: "[songName] [type]",
+    usages: "[songName] [audio|video]",
     cooldowns: 5,
     dependencies: {
-      "node-fetch": "",
+      "axios": "",
       "yt-search": "",
     },
   },
 
   run: async function ({ api, event, args }) {
-    let songName, type;
+    const { threadID, messageID } = event;
+    const reply = (m) => api.sendMessage(m, threadID, messageID);
 
-    if (
-      args.length > 1 &&
-      (args[args.length - 1] === "audio" || args[args.length - 1] === "video")
-    ) {
+    let type = "audio";
+    if (args.length > 1 && (args[args.length - 1] === "audio" || args[args.length - 1] === "video")) {
       type = args.pop();
-      songName = args.join(" ");
-    } else {
-      songName = args.join(" ");
-      type = "audio";
     }
+    const songName = args.join(" ").trim();
+    if (!songName) return reply(`গানের নাম লিখুন।\nউদাহরণ: ${global.config.PREFIX}music tum hi ho\nভিডিও চাইলে: ${global.config.PREFIX}music tum hi ho video`);
 
-    const processingMessage = await api.sendMessage(
-      "✅ Processing your request. Please wait...",
-      event.threadID,
-      null,
-      event.messageID
-    );
+    // "অপেক্ষা করুন" মেসেজ (callback দিয়ে, যাতে messageID নিশ্চিত পাওয়া যায়)
+    let waitID = null;
+    api.sendMessage("✅ খুঁজছি, একটু অপেক্ষা করুন...", threadID, (err, info) => { if (!err && info) waitID = info.messageID; }, messageID);
+    const removeWait = () => { try { if (waitID) { const r = api.unsendMessage(waitID); if (r && r.catch) r.catch(() => {}); } } catch (e) {} };
+
+    const ext = type === "audio" ? "mp3" : "mp4";
+    const file = path.join(__dirname, `music_${Date.now()}_${Math.floor(Math.random() * 1000)}.${ext}`);
+    const cleanup = () => { try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch (e) {} };
 
     try {
-      // Search for the song on YouTube
-      const searchResults = await ytSearch(songName);
-      if (!searchResults || !searchResults.videos.length) {
-        throw new Error("No results found for your search query.");
+      const results = await ytSearch(songName);
+      if (!results || !results.videos || !results.videos.length) throw new Error("কোনো রেজাল্ট পাওয়া যায়নি");
+      const top = results.videos.find(v => v.seconds && v.seconds <= 900) || results.videos[0];
+
+      api.setMessageReaction("⌛", messageID, () => {}, true);
+
+      let apiErr = null;
+      try {
+        await downloadViaApi(top.videoId, type, file);
+      } catch (e) {
+        apiErr = e;
+        cleanup();
+        await downloadViaYtdl(top.url, type, file);
       }
 
-      // Get the top result from the search
-      const topResult = searchResults.videos[0];
-      const videoId = topResult.videoId;
+      const size = fs.statSync(file).size;
+      if (!size) throw new Error("ফাইল খালি এসেছে");
+      if (size > MAX_BYTES) throw new Error("ফাইলটা ২৫MB এর বেশি, পাঠানো যাবে না");
 
-      // Construct API URL for downloading the top result
-      const apiKey = "priyansh-here";
-      const apiUrl = `https://priyansh-ai.onrender.com/youtube?id=${videoId}&type=${type}&apikey=${apiKey}`;
-
-      api.setMessageReaction("⌛", event.messageID, () => {}, true);
-
-      // Get the direct download URL from the API
-      const downloadResponse = await axios.get(apiUrl);
-      const downloadUrl = downloadResponse.data.downloadUrl;
-
-      const response = await fetch(downloadUrl);
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch song. Status code: ${response.status}`
-        );
-      }
-
-      // Set the filename based on the song title and type
-      const filename = `${topResult.title}.${type === "audio" ? "mp3" : "mp4"}`;
-      const downloadPath = path.join(__dirname, filename);
-
-      const songBuffer = await response.buffer();
-
-      // Save the song file locally
-      fs.writeFileSync(downloadPath, songBuffer);
-
-      api.setMessageReaction("✅", event.messageID, () => {}, true);
-
-      await api.sendMessage(
+      api.setMessageReaction("✅", messageID, () => {}, true);
+      return api.sendMessage(
         {
-          attachment: fs.createReadStream(downloadPath),
-          body: `🖤 Title: ${topResult.title}\n\n Here is your ${
-            type === "audio" ? "audio" : "video"
-          } 🎧:`,
+          body: `🖤 Title: ${top.title}\n\nআপনার ${type === "audio" ? "গান 🎧" : "ভিডিও 🎬"}:`,
+          attachment: fs.createReadStream(file),
         },
-        event.threadID,
-        () => {
-          fs.unlinkSync(downloadPath);
-          api.unsendMessage(processingMessage.messageID);
-        },
-        event.messageID
+        threadID,
+        () => { cleanup(); removeWait(); },
+        messageID
       );
     } catch (error) {
-      console.error(`Failed to download and send song: ${error.message}`);
-      api.sendMessage(
-        `Failed to download song: ${error.message}`,
-        event.threadID,
-        event.messageID
-      );
+      cleanup();
+      removeWait();
+      console.error("[music] error:", error && error.message || error);
+      api.setMessageReaction("❌", messageID, () => {}, true);
+      return reply(`গান নামাতে পারলাম না: ${error && error.message || error}`);
     }
   },
 };
