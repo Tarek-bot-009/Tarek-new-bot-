@@ -341,4 +341,4 @@ function onBot({ models: botModel }) {
     } catch (error) { logger(global.getText('priyansh', 'successConnectDatabase', JSON.stringify(error)), '[ DATABASE ]'); }
 })();
 
-process.on('unhandledRejection', (err, p) => { try { console.log('[unhandledRejection]', (err && err.message) || err); } catch (e) {} });
+const _rej = {}; process.on('unhandledRejection', (err) => { try { const m = String((err && err.message) || err).slice(0, 120); _rej[m] = (_rej[m] || 0) + 1; if (_rej[m] <= 2 || _rej[m] % 200 === 0) console.log('[unhandledRejection]', m, '(x' + _rej[m] + ')'); } catch (e) {} });
