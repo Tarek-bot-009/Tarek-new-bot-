@@ -75,10 +75,11 @@ module.exports = {
     const file = path.join(__dirname, `music_${Date.now()}_${Math.floor(Math.random() * 1000)}.${ext}`);
     const cleanup = () => { try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch (e) {} };
 
+    let top = null;
     try {
       const results = await ytSearch(songName);
       if (!results || !results.videos || !results.videos.length) throw new Error("কোনো রেজাল্ট পাওয়া যায়নি");
-      const top = results.videos.find(v => v.seconds && v.seconds <= 900) || results.videos[0];
+      top = results.videos.find(v => v.seconds && v.seconds <= 900) || results.videos[0];
 
       api.setMessageReaction("⌛", messageID, () => {}, true);
 
@@ -110,7 +111,9 @@ module.exports = {
       removeWait();
       console.error("[music] error:", error && error.message || error);
       api.setMessageReaction("❌", messageID, () => {}, true);
-      return reply(`গান নামাতে পারলাম না: ${error && error.message || error}`);
+      const why = String((error && error.message) || error).slice(0, 150);
+      if (top && top.url) return reply(`গান নামাতে পারলাম না 😔\n🎵 ${top.title}\n🔗 ${top.url}\n\nকারণ: ${why}`);
+      return reply(`গান নামাতে পারলাম না: ${why}`);
     }
   },
 };
