@@ -4,45 +4,50 @@ const path = require("path");
 const ytSearch = require("yt-search");
 
 const MAX_BYTES = 25 * 1024 * 1024; // মেসেঞ্জারে পাঠানোর সীমা ~25MB
-const SAAVN = ["https://saavn.dev", "https://saavn.me"];
-const PIPED = ["https://pipedapi.kavin.rocks", "https://pipedapi.adminforge.de", "https://api.piped.private.coffee"];
+const PIPED = ["https://pipedapi.kavin.rocks", "https://pipedapi.adminforge.de"];
+let _scId = null; // SoundCloud client_id (নিজে থেকে খুঁজে নেয়)
 
 async function saveUrl(url, file) {
     const res = await axios.get(url, { responseType: "arraybuffer", timeout: 90000, maxContentLength: MAX_BYTES * 2, headers: { "User-Agent": "Mozilla/5.0" } });
     fs.writeFileSync(file, Buffer.from(res.data));
 }
 
-// উৎস ১: JioSaavn (YouTube-এর বট-চেক নেই)
-async function viaSaavn(q, file) {
-    let last;
-    for (const base of SAAVN) {
+// উৎস ১: SoundCloud (YouTube-এর বট-চেক নেই)
+async function getScClientId() {
+    if (_scId) return _scId;
+    const home = await axios.get("https://soundcloud.com/", { timeout: 15000, headers: { "User-Agent": "Mozilla/5.0" } });
+    const scripts = (String(home.data).match(/https:\/\/a-v2\.sndcdn\.com\/assets\/[^"']+\.js/g) || []).reverse();
+    for (const u of scripts) {
         try {
-            const r = await axios.get(`${base}/api/search/songs`, { params: { query: q, limit: 1 }, timeout: 12000 });
-            const s = r.data && r.data.data && r.data.data.results && r.data.data.results[0];
-            if (!s) throw new Error("গান পাওয়া যায়নি");
-            const dl = (s.downloadUrl || []).filter(x => x && x.url);
-            if (!dl.length) throw new Error("লিংক নেই");
-            await saveUrl(dl[dl.length - 1].url, file);
-            return { title: s.name, artist: ((s.artists && s.artists.primary) || []).map(a => a.name).join(", ") };
-        } catch (e) { last = e; }
+            const js = await axios.get(u, { timeout: 15000, headers: { "User-Agent": "Mozilla/5.0" } });
+            const m = String(js.data).match(/client_id:"([a-zA-Z0-9]{32})"/);
+            if (m) { _scId = m[1]; return _scId; }
+        } catch (e) {}
     }
-    throw last || new Error("saavn ব্যর্থ");
+    throw new Error("client_id পাওয়া যায়নি");
 }
 
-// উৎস ২: আগের Priyansh API
-async function viaApi(videoId, file) {
-    const r = await axios.get(`https://priyansh-ai.onrender.com/youtube?id=${videoId}&type=audio&apikey=priyansh-here`, { timeout: 20000 });
-    const url = r.data && r.data.downloadUrl;
-    if (!url) throw new Error("লিংক নেই");
-    await saveUrl(url, file);
+async function viaSoundCloud(q, file) {
+    let id;
+    try { id = await getScClientId(); } catch (e) { throw e; }
+    const r = await axios.get("https://api-v2.soundcloud.com/search/tracks", { params: { q, client_id: id, limit: 10 }, timeout: 15000, headers: { "User-Agent": "Mozilla/5.0" } });
+    const tracks = ((r.data && r.data.collection) || []).filter(t => t && t.streamable && t.policy !== "SNIP" && t.policy !== "BLOCK" && t.duration > 60000);
+    if (!tracks.length) throw new Error("গান পাওয়া যায়নি");
+    const t = tracks[0];
+    const tr = ((t.media && t.media.transcodings) || []).find(x => x.format && x.format.protocol === "progressive");
+    if (!tr) throw new Error("ডাউনলোড লিংক নেই");
+    const st = await axios.get(tr.url, { params: { client_id: id }, timeout: 15000 });
+    if (!st.data || !st.data.url) throw new Error("স্ট্রিম লিংক নেই");
+    await saveUrl(st.data.url, file);
+    return { title: t.title, artist: (t.user && t.user.username) || "" };
 }
 
-// উৎস ৩: Piped (YouTube-এর বিকল্প সার্ভার)
+// উৎস ২: Piped (YouTube-এর বিকল্প সার্ভার)
 async function viaPiped(videoId, file) {
     let last;
     for (const base of PIPED) {
         try {
-            const r = await axios.get(`${base}/streams/${videoId}`, { timeout: 12000 });
+            const r = await axios.get(`${base}/streams/${videoId}`, { timeout: 8000 });
             const list = ((r.data && r.data.audioStreams) || []).filter(a => a.url && /audio\/mp4/.test(a.mimeType || ""));
             list.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
             if (!list.length) throw new Error("অডিও লিংক নেই");
@@ -53,7 +58,7 @@ async function viaPiped(videoId, file) {
     throw last || new Error("piped ব্যর্থ");
 }
 
-// উৎস ৪: সরাসরি YouTube (cache/yt-cookies.json থাকলে সেটা ব্যবহার করে)
+// উৎস ৩: সরাসরি YouTube (cache/yt-cookies.json থাকলে সেটা ব্যবহার করে)
 async function viaYtdl(videoUrl, file) {
     let ytdl = null;
     for (const m of ["@distube/ytdl-core", "ytdl-core"]) { try { ytdl = require(m); break; } catch (e) {} }
@@ -90,8 +95,7 @@ async function fetchSong(video, file, query) {
     const errors = [];
     let info = null;
     const steps = [
-        ["saavn", async () => { info = await viaSaavn(query || cleanTitle(video.title), file); }],
-        ["api", () => viaApi(video.videoId, file)],
+        ["soundcloud", async () => { info = await viaSoundCloud(query || cleanTitle(video.title), file); }],
         ["piped", () => viaPiped(video.videoId, file)],
         ["youtube", () => viaYtdl(video.url, file)]
     ];
@@ -112,7 +116,7 @@ async function fetchSong(video, file, query) {
 
 module.exports.config = {
     name: "song",
-    version: "3.0.0",
+    version: "4.0.0",
     hasPermssion: 0,
     credits: "NAZRUL (fixed)",
     description: "গানের নাম বা YouTube লিংক দিলে সরাসরি গান পাঠায়",
@@ -156,7 +160,7 @@ module.exports.run = async function ({ api, event, args }) {
             const list = r.videos || [];
             video = list.find(v => v.seconds && v.seconds <= 1200) || list[0];
             if (!video) { removeWait(); return reply("কোনো গান পাওয়া যায়নি, অন্য নামে চেষ্টা করুন।"); }
-            query = keyword; // Saavn-এ ব্যবহারকারীর লেখা নামেই খোঁজা হবে
+            query = keyword; // SoundCloud-এ ব্যবহারকারীর লেখা নামেই খোঁজা হবে
         }
 
         api.setMessageReaction("⌛", messageID, () => {}, true);
