@@ -1,6 +1,6 @@
 module.exports.config = {
     name: "rip2",
-    version: "3.0.0",
+    version: "4.0.0",
     hasPermssion: 0,
     credits: "Nazrul (fixed)",
     description: "কবরের মিম: ফলকে মেনশন করা ব্যক্তির ছবি, হাঁটু গেড়ে বসা লোকটার মুখে তোমার ছবি",
@@ -54,20 +54,28 @@ function drawRound(ctx, img, x, y, r, ring) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
 }
 
-// cache/rip2_bg.jpg (কবরের মিম ছবি) থাকলে সেটা ব্যবহার করে
+// কবরের মিম ছবির উপর দুজনের ছবি বসানো (মাপ ৪৮১×৪৮০)
 function drawMeme(ctx, W, H, tpl, tombAv, kneelAv, name) {
     ctx.drawImage(tpl, 0, 0, W, H);
-    drawRound(ctx, tombAv, 250, 410, 84, "#e8e8e8");   // ফলকের ভেতরে
-    drawRound(ctx, kneelAv, 548, 450, 94, "#101620");  // বসা লোকটার মুখে
+    drawRound(ctx, tombAv, 125, 205, 44, "#e8e8e8");   // ফলকের ভেতরে
+    drawRound(ctx, kneelAv, 274, 225, 47, "#101620");  // বসা লোকটার মুখে
     ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.fillRect(0, H - 74, W, 74);
+    ctx.fillRect(0, H - 38, W, 38);
     ctx.textAlign = "center";
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 34px Arial, 'Noto Sans Bengali', sans-serif";
+    ctx.font = "bold 18px Arial, 'Noto Sans Bengali', sans-serif";
     let text = "R.I.P " + name;
-    const lines = wrapText(ctx, text, W - 60);
+    const lines = wrapText(ctx, text, W - 30);
     if (lines.length > 1) text = lines[0] + "...";
-    ctx.fillText(text, W / 2, H - 28);
+    ctx.fillText(text, W / 2, H - 13);
+}
+
+// টেমপ্লেট ছবি: cache/rip2_bg.jpg
+async function loadTemplate(fs, path, loadImage, cacheDir) {
+    const jpg = path.join(cacheDir, "rip2_bg.jpg");
+    try { if (fs.existsSync(jpg)) return await loadImage(jpg); }
+    catch (e) { console.log("[rip2] rip2_bg.jpg পড়া যায়নি (ফরম্যাট JPG/PNG হতে হবে):", e && e.message); }
+    return null;
 }
 
 // টেমপ্লেট ছবি না থাকলে নিজে-আঁকা রাতের কবর
@@ -148,7 +156,6 @@ module.exports.run = async function ({ api, event, Users }) {
     const { loadImage, createCanvas } = require("canvas");
 
     const cacheDir = path.join(__dirname, "cache");
-    const bgPath = path.join(cacheDir, "rip2_bg.jpg");
     const outPath = path.join(cacheDir, `rip2_${Date.now()}_${Math.floor(Math.random() * 1000)}.png`);
 
     try {
@@ -161,13 +168,12 @@ module.exports.run = async function ({ api, event, Users }) {
         const tombAv = await loadAvatar(axios, loadImage, targetID);
         const kneelAv = targetID === senderID ? tombAv : await loadAvatar(axios, loadImage, senderID);
 
-        let tpl = null;
-        if (fs.existsSync(bgPath)) { try { tpl = await loadImage(bgPath); } catch (e) { console.log("[rip2] টেমপ্লেট পড়া যায়নি:", e && e.message); } }
+        const tpl = await loadTemplate(fs, path, loadImage, cacheDir);
 
         let canvas;
         if (tpl) {
-            canvas = createCanvas(962, 960);
-            drawMeme(canvas.getContext("2d"), 962, 960, tpl, tombAv, kneelAv, name);
+            canvas = createCanvas(481, 480);
+            drawMeme(canvas.getContext("2d"), 481, 480, tpl, tombAv, kneelAv, name);
         } else {
             canvas = createCanvas(1280, 720);
             drawNight(canvas.getContext("2d"), 1280, 720, tombAv, name);
