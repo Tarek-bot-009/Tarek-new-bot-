@@ -1,6 +1,6 @@
 module.exports.config = {
     name: "rip2",
-    version: "4.0.0",
+    version: "5.0.0",
     hasPermssion: 0,
     credits: "Nazrul (fixed)",
     description: "কবরের মিম: ফলকে মেনশন করা ব্যক্তির ছবি, হাঁটু গেড়ে বসা লোকটার মুখে তোমার ছবি",
@@ -42,6 +42,7 @@ async function getImage(axios, urls) {
     return null;
 }
 
+
 // ফলকে ও মুখে গোল ছবি বসানো (না পেলে ধূসর গোল)
 function drawRound(ctx, img, x, y, r, ring) {
     ctx.save();
@@ -70,11 +71,29 @@ function drawMeme(ctx, W, H, tpl, tombAv, kneelAv, name) {
     ctx.fillText(text, W / 2, H - 13);
 }
 
-// টেমপ্লেট ছবি: cache/rip2_bg.jpg
+// মিম টেমপ্লেট খোঁজা: cache ফোল্ডারে যে নামেই ছবিটা আপলোড করো, মাপ ৪৮১×৪৮০ হলে বট নিজে চিনে নেবে
+let _tplCache = null;
 async function loadTemplate(fs, path, loadImage, cacheDir) {
-    const jpg = path.join(cacheDir, "rip2_bg.jpg");
-    try { if (fs.existsSync(jpg)) return await loadImage(jpg); }
-    catch (e) { console.log("[rip2] rip2_bg.jpg পড়া যায়নি (ফরম্যাট JPG/PNG হতে হবে):", e && e.message); }
+    if (_tplCache) return _tplCache;
+    // ১) পরিচিত নাম
+    for (const n of ["rip2_bg.jpg", "rip2_bg.jpeg", "rip2_bg.png"]) {
+        const p = path.join(cacheDir, n);
+        try { if (fs.existsSync(p)) { _tplCache = await loadImage(p); return _tplCache; } } catch (e) {}
+    }
+    // ২) যেকোনো নামের ছবি, যার মাপ ঠিক ৪৮১×৪৮০
+    try {
+        const files = fs.readdirSync(cacheDir).filter(f => /\.(jpe?g|png)$/i.test(f));
+        for (const f of files) {
+            const p = path.join(cacheDir, f);
+            try {
+                const size = fs.statSync(p).size;
+                if (size < 15000 || size > 600000) continue;
+                const img = await loadImage(p);
+                if (img.width === 481 && img.height === 480) { _tplCache = img; console.log("[rip2] টেমপ্লেট পাওয়া গেছে:", f); return img; }
+            } catch (e) {}
+        }
+    } catch (e) {}
+    console.log("[rip2] মিম টেমপ্লেট ছবি পাওয়া যায়নি (cache ফোল্ডারে ৪৮১×৪৮০ মাপের ছবি দিন), রাতের কবর আঁকছি");
     return null;
 }
 
