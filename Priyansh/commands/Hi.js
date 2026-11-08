@@ -28,7 +28,7 @@ module.exports.handleEvent = async ({ api, event, Threads }) => {
     const body = content.toLowerCase();
   if (body.startsWith("hi")) {
     const rahad = [
-      "হাই হ্যালো না বলে\nসালাম দিতে শিখো প্রিয়🥀🥀🌹"
+      "হাই হ্যালো না বলে\nসালাম দিতে শিখো প্রিয়🥀🥀"
     
     ];
     const rahad2 = rahad[Math.floor(Math.random() * rahad.length)];
