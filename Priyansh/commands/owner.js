@@ -3,7 +3,7 @@ const fs = require("fs");
 const request = require("request");
  
 const link = [
-  "https://i.imgur.com/nde417R.mp4",
+  "https://i.imgur.com/YCXF6To.mp4",,
  
 ];
  
@@ -28,7 +28,7 @@ module.exports.handleEvent = async ({ api, event, Threads }) => {
     const body = content.toLowerCase();
   if (body.startsWith("owner")) {
     const rahad = [
-      "আমার বস তারেক সরকার❤️❤️🥰"
+      "Boss Tarek ai video❤️❤️🥰"
     
     ];
     const rahad2 = rahad[Math.floor(Math.random() * rahad.length)];
