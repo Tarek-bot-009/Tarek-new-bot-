@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+# নতুন কমিট হলে আগের চলমান বট নিজে থেকে বন্ধ হবে (একসাথে দুটো বট চলবে না)
+concurrency:
+  group: bot
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
