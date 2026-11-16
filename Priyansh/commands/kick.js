@@ -1,39 +1,126 @@
 module.exports.config = {
 	name: "kick",
-	version: "1.0.1", 
+	version: "1.7.0",
 	hasPermssion: 1,
-	credits: "𝐏𝐫𝐢𝐲𝐚𝐧𝐬𝐡 𝐑𝐚𝐣𝐩𝐮𝐭",
-  description: "the person you need to remove from the group by tag",
-	commandCategory: "System", 
-	usages: "[tag]", 
-	cooldowns: 0,
+	credits: "MR JUWEL",
+	description: "Ultra fast multi kick system (admins allowed)",
+	commandCategory: "System",
+	usages: "[tag/reply]",
+	cooldowns: 2,
 };
 
-module.exports.languages = {
-	"vi": {
-		"error": "Đã có lỗi xảy ra, vui lòng thử lại sau",
-		"needPermssion": "Cần quyền quản trị viên nhóm\nVui lòng thêm và thử lại!",
-		"missingTag": "Bạn phải tag người cần kick"
-	},
-	"en": {
-		"error": "Error! An error occurred. Please try again later!",
-		"needPermssion": "Need group admin\nPlease add and try again!",
-		"missingTag": "You need tag some person to kick"
-	}
-}
-
-module.exports.run = async function({ api, event, getText, Threads }) {
-	var mention = Object.keys(event.mentions);
+module.exports.run = async function ({ api, event }) {
 	try {
-		let dataThread = (await Threads.getData(event.threadID)).threadInfo;
-		if (!dataThread.adminIDs.some(item => item.id == api.getCurrentUserID())) return api.sendMessage(getText("needPermssion"), event.threadID, event.messageID);
-		if(!mention[0]) return api.sendMessage("You have to tag the need to kick",event.threadID);
-		if (dataThread.adminIDs.some(item => item.id == event.senderID)) {
-			for (const o in mention) {
-				setTimeout(() => {
-					api.removeUserFromGroup(mention[o],event.threadID) 
-				},3000)
+		const threadID = event.threadID;
+		const botID = String(api.getCurrentUserID());
+
+		// গ্রুপের তথ্য আনা
+		const info = await api.getThreadInfo(threadID);
+
+		// adminIDs normalize
+		const adminIDs = (info.adminIDs || []).map(a => {
+			if (a && typeof a === 'object') {
+				return String(a.id || a.userID || a.uid || a);
 			}
+			return String(a);
+		});
+
+		// গ্রুপ ক্রিয়েটর (owner) — এদের কিক করা যাবে না
+		const ownerID = String(info.threadCreatorID || info.creatorID || "");
+
+		// বট নিজে এডমিন কিনা চেক
+		if (!adminIDs.includes(botID)) {
+			return api.sendMessage(
+				"❌ আমি এই গ্রুপের এডমিন না!\nআগে আমাকে এডমিন বানান, তারপর কিক করতে পারবো।",
+				threadID,
+				event.messageID
+			);
 		}
-	} catch { return api.sendMessage(getText("error"),event.threadID) }
-}
+
+		let targetIDs = [];
+
+		if (event.type === "message_reply") {
+			targetIDs.push(event.messageReply.senderID);
+		}
+
+		if (event.mentions) {
+			targetIDs = targetIDs.concat(Object.keys(event.mentions));
+		}
+
+		targetIDs = [...new Set(targetIDs.map(String))];
+
+		if (targetIDs.length === 0)
+			return api.sendMessage("⚠️ Reply or tag someone!", threadID, event.messageID);
+
+		// শুধু বট নিজে এবং গ্রুপ ক্রিয়েটরকে বাদ দেওয়া (এডমিনদের এখন কিক করা যাবে)
+		const skipped = [];
+		const validIDs = targetIDs.filter(id => {
+			if (id === botID) {
+				skipped.push({ id, reason: "bot" });
+				return false;
+			}
+			if (ownerID && id === ownerID) {
+				skipped.push({ id, reason: "owner" });
+				return false;
+			}
+			return true;
+		});
+
+		if (validIDs.length === 0)
+			return api.sendMessage(
+				"⚠️ বট নিজেকে বা গ্রুপ ক্রিয়েটরকে কিক করা যাবে না!",
+				threadID,
+				event.messageID
+			);
+
+		// কতজন এডমিন কিক করতে যাচ্ছি
+		const adminTargets = validIDs.filter(id => adminIDs.includes(id));
+
+		await api.sendMessage(
+			`⚡ KICK STARTED\n👥 Total: ${validIDs.length}\n` +
+			`🛡️ Admin targets: ${adminTargets.length}\n🚀 Fast mode ON`,
+			threadID
+		);
+
+		let kicked = 0;
+		let failed = 0;
+		const failedList = [];
+
+		await Promise.all(
+			validIDs.map(id =>
+				new Promise(resolve => {
+					api.removeUserFromGroup(id, threadID, (err) => {
+						if (err) {
+							failed++;
+							failedList.push(id);
+						} else {
+							kicked++;
+						}
+						resolve();
+					});
+				})
+			)
+		);
+
+		let resultMsg =
+			`╭──── FAST RESULT ────╮\n` +
+			`│ 👥 Total: ${validIDs.length}\n` +
+			`│ ✅ Kicked: ${kicked}\n` +
+			`│ ❌ Failed: ${failed}\n` +
+			`│ ⏭️ Skipped: ${skipped.length}\n` +
+			`│ ⚡ Mode: Ultra Fast\n` +
+			`╰────────────────────╯`;
+
+		if (failed > 0) {
+			resultMsg +=
+				`\n\n⚠️ ${failed} জনকে কিক দেওয়া যায়নি।\n` +
+				`সম্ভাব্য কারণ: এডমিনকে কিক দিতে হলে বটকে গ্রুপ ক্রিয়েটর হতে হবে অথবা Facebook ব্লক করেছে।`;
+		}
+
+		return api.sendMessage(resultMsg, threadID);
+
+	} catch (err) {
+		console.log(err);
+		return api.sendMessage("❌ Kick error!", event.threadID);
+	}
+};
