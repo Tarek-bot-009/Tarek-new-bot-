@@ -16,9 +16,9 @@ module.exports.config = {
     }
 };
 
-// ছবির দুই বৃত্ত (মাপ ৪৮০×৪৮০): উপরে = তুমি, নিচে = মেনশন করা বন্ধু
-const FRAME_TOP = { x: 140, y: 55, r: 60 };
-const FRAME_BOTTOM = { x: 110, y: 428, r: 52 };
+// ছবির দুই বৃত্ত (মাপ ৯৬০×৯৬০): উপরে = তুমি, নিচে = মেনশন করা বন্ধু
+const FRAME_TOP = { x: 278, y: 115, r: 130 };
+const FRAME_BOTTOM = { x: 222, y: 860, r: 118 };
 
 
 async function getImage(axios, urls) {
@@ -68,11 +68,23 @@ function drawSimple(ctx, W, H) {
     ctx.fillRect(0, 0, W, H);
 }
 
-module.exports.run = async function ({ api, event, Users }) {
+module.exports.run = async function ({ api, event, Users, args }) {
     const { threadID, messageID, senderID } = event;
     const fs = require("fs-extra");
     const axios = require("axios");
     const { loadImage, createCanvas } = require("canvas");
+
+    if (args && String(args[0] || "").toLowerCase() === "check") {
+        const cd = path.join(__dirname, "cache");
+        const p = path.join(cd, "jm_bg.jpg");
+        let info = "❌ jm_bg.jpg পাওয়া যায়নি";
+        try {
+            if (fs.existsSync(p)) info = "✅ jm_bg.jpg পাওয়া গেছে (" + fs.statSync(p).size + " বাইট)";
+            const list = fs.existsSync(cd) ? fs.readdirSync(cd).filter(f => /jm/i.test(f)) : [];
+            info += "\ncache ফোল্ডারে jm-সম্পর্কিত ফাইল: " + (list.join(", ") || "কিছুই নেই");
+        } catch (e) {}
+        return api.sendMessage("পরীক্ষার ফল:\n" + info + "\nপথ: " + p, threadID, messageID);
+    }
 
     let targetID = Object.keys(event.mentions || {})[0];
     if (!targetID && event.type === "message_reply" && event.messageReply) targetID = event.messageReply.senderID;
@@ -92,7 +104,7 @@ module.exports.run = async function ({ api, event, Users }) {
         const avB = await loadAvatar(axios, loadImage, targetID);
 
         const tpl = await loadTemplate(fs, loadImage, cacheDir);
-        const W = 480, H = 480;
+        const W = 960, H = 960;
         const canvas = createCanvas(W, H);
         const ctx = canvas.getContext("2d");
 
@@ -116,4 +128,4 @@ module.exports.run = async function ({ api, event, Users }) {
         return api.sendMessage("ছবি বানাতে পারলাম না, আবার চেষ্টা করুন।", threadID, messageID);
     }
 };
-                                    
+        
