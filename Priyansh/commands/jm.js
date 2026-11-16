@@ -2,7 +2,7 @@ const path = require("path");
 
 module.exports.config = {
     name: "jm",
-    version: "2.2.0",
+    version: "2.1.0",
     hasPermssion: 0,
     credits: "Tarek robot",
     description: "মিম: তোমার আর মেনশন করা বন্ধুর ছবি দুই বৃত্তে বসে",
@@ -19,6 +19,7 @@ module.exports.config = {
 // ছবির দুই বৃত্ত (মাপ ৪৮০×৪৮০): উপরে = তুমি, নিচে = মেনশন করা বন্ধু
 const FRAME_TOP = { x: 140, y: 55, r: 60 };
 const FRAME_BOTTOM = { x: 110, y: 428, r: 52 };
+
 
 async function getImage(axios, urls) {
     for (const url of urls) {
@@ -115,3 +116,4 @@ module.exports.run = async function ({ api, event, Users }) {
         return api.sendMessage("ছবি বানাতে পারলাম না, আবার চেষ্টা করুন।", threadID, messageID);
     }
 };
+                                    
