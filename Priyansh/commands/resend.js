@@ -4,7 +4,7 @@ const path = require("path");
 
 module.exports.config = {
     name: "resend",
-    version: "2.0.0",
+    version: "2.1.0",
     hasPermssion: 0,
     credits: "Tarek robot (fixed)",
     description: "কেউ মেসেজ, ছবি বা ভয়েস মুছে দিলে বট আবার পাঠায়",
@@ -38,7 +38,12 @@ async function saveAttachments(msgID, attachments) {
         i++;
         const p = path.join(CACHE, `${msgID.replace(/[^a-zA-Z0-9]/g, "")}_${i}.${extFor(att)}`);
         try {
-            const res = await axios.get(att.url, { responseType: "arraybuffer", timeout: 60000, maxContentLength: MAX_BYTES });
+            let res = null;
+            for (let k = 0; k < 2 && !res; k++) {
+                try {
+                    res = await axios.get(att.url, { responseType: "arraybuffer", timeout: 60000, maxContentLength: MAX_BYTES, headers: { "User-Agent": "Mozilla/5.0", "Accept": "*/*" } });
+                } catch (e) { if (k === 1) throw e; await new Promise(r => setTimeout(r, 1500)); }
+            }
             fs.writeFileSync(p, Buffer.from(res.data));
             files.push({ path: p, type: att.type });
         } catch (e) {
@@ -111,4 +116,4 @@ module.exports.run = async function ({ api, event, args }) {
     global.data.threadData.set(tid, cur);
     return api.sendMessage(`resend ${arg === "on" ? "চালু" : "বন্ধ"} হয়েছে।`, threadID, messageID);
 };
-			   
+	
