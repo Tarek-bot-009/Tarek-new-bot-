@@ -1,0 +1,207 @@
+const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
+const ytSearch = require("yt-search");
+
+const MAX_BYTES = 25 * 1024 * 1024;
+const UA = { "User-Agent": "Mozilla/5.0" };
+const PIPED = ["https://pipedapi.kavin.rocks", "https://pipedapi.adminforge.de"];
+let _scId = null;
+
+async function saveUrl(url, file) {
+    const res = await axios.get(url, { responseType: "arraybuffer", timeout: 90000, maxContentLength: MAX_BYTES * 2, headers: UA });
+    fs.writeFileSync(file, Buffer.from(res.data));
+}
+
+async function getScClientId() {
+    if (_scId) return _scId;
+    const home = await axios.get("https://soundcloud.com/", { timeout: 15000, headers: UA });
+    const scripts = (String(home.data).match(/https:\/\/a-v2\.sndcdn\.com\/assets\/[^"']+\.js/g) || []).reverse();
+    for (const u of scripts) {
+        try {
+            const js = await axios.get(u, { timeout: 15000, headers: UA });
+            const m = String(js.data).match(/client_id:"([a-zA-Z0-9]{32})"/);
+            if (m) { _scId = m[1]; return _scId; }
+        } catch (e) {}
+    }
+    throw new Error("client_id পাওয়া যায়নি");
+}
+
+async function saveHls(m3u8Url, file) {
+    const pl = await axios.get(m3u8Url, { timeout: 15000, responseType: "text", headers: UA });
+    const lines = String(pl.data).split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith("#"));
+    if (!lines.length) throw new Error("টুকরোর তালিকা খালি");
+    const urls = lines.map(l => new URL(l, m3u8Url).href);
+    const parts = new Array(urls.length);
+    let total = 0, next = 0;
+    const worker = async () => {
+        while (true) {
+            const i = next++;
+            if (i >= urls.length) return;
+            const r = await axios.get(urls[i], { responseType: "arraybuffer", timeout: 30000, headers: UA });
+            parts[i] = Buffer.from(r.data);
+            total += parts[i].length;
+            if (total > MAX_BYTES) throw new Error("ফাইল ২৫MB এর বেশি");
+        }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    fs.writeFileSync(file, Buffer.concat(parts));
+}
+
+async function viaSoundCloud(q, file) {
+    const id = await getScClientId();
+    const r = await axios.get("https://api-v2.soundcloud.com/search/tracks", { params: { q, client_id: id, limit: 12 }, timeout: 15000, headers: UA });
+    const tracks = ((r.data && r.data.collection) || []).filter(t => t && t.streamable && t.policy !== "SNIP" && t.policy !== "BLOCK" && t.duration > 60000 && t.duration <= 900000);
+    if (!tracks.length) throw new Error("গান পাওয়া যায়নি");
+    let lastErr = new Error("ডাউনলোড লিংক নেই");
+    for (const t of tracks.slice(0, 4)) {
+        try {
+            const tcs = (t.media && t.media.transcodings) || [];
+            const prog = tcs.find(x => x.format && x.format.protocol === "progressive");
+            const hls = tcs.find(x => x.format && x.format.protocol === "hls" && /mpeg/.test(x.format.mime_type || ""));
+            const pick = prog || hls;
+            if (!pick) { lastErr = new Error("ডাউনলোড লিংক নেই"); continue; }
+            const st = await axios.get(pick.url, { params: { client_id: id }, timeout: 15000 });
+            if (!st.data || !st.data.url) throw new Error("স্ট্রিম লিংক নেই");
+            if (pick === prog) await saveUrl(st.data.url, file);
+            else await saveHls(st.data.url, file);
+            return { title: t.title, artist: (t.user && t.user.username) || "" };
+        } catch (e) { lastErr = e; try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch (e2) {} }
+    }
+    throw lastErr;
+}
+
+async function viaPiped(videoId, file) {
+    let last;
+    for (const base of PIPED) {
+        try {
+            const r = await axios.get(`${base}/streams/${videoId}`, { timeout: 8000 });
+            const list = ((r.data && r.data.audioStreams) || []).filter(a => a.url && /audio\/mp4/.test(a.mimeType || ""));
+            list.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+            if (!list.length) throw new Error("অডিও লিংক নেই");
+            await saveUrl(list[0].url, file);
+            return;
+        } catch (e) { last = e; }
+    }
+    throw last || new Error("piped ব্যর্থ");
+}
+
+async function viaYtdl(videoUrl, file) {
+    let ytdl = null;
+    for (const m of ["@distube/ytdl-core", "ytdl-core"]) { try { ytdl = require(m); break; } catch (e) {} }
+    if (!ytdl) throw new Error("ytdl নেই");
+    await new Promise((resolve, reject) => {
+        const stream = ytdl(videoUrl, { filter: "audioonly", quality: "highestaudio", highWaterMark: 1 << 25 });
+        const out = fs.createWriteStream(file);
+        stream.on("error", reject);
+        out.on("error", reject);
+        out.on("finish", resolve);
+        stream.pipe(out);
+    });
+}
+
+function cleanTitle(t) {
+    return String(t || "").split("|")[0].replace(/\(.*?\)|\[.*?\]/g, "").replace(/official|video|audio|lyrics|lyrical|full song|hd|4k/gi, "").replace(/\s+/g, " ").trim().slice(0, 70);
+}
+
+function convertHMS(sec) {
+    sec = parseInt(sec, 10) || 0;
+    const h = Math.floor(sec / 3600), m = Math.floor((sec - h * 3600) / 60), s = sec - h * 3600 - m * 60;
+    const p = (n) => (n < 10 ? "0" + n : "" + n);
+    return (h ? p(h) + ":" : "") + p(m) + ":" + p(s);
+}
+
+async function fetchSong(video, file, query) {
+    const errors = [];
+    let info = null;
+    const steps = [
+        ["soundcloud", async () => { info = await viaSoundCloud(query || cleanTitle(video.title), file); }],
+        ["piped", () => viaPiped(video.videoId, file)],
+        ["youtube", () => viaYtdl(video.url, file)]
+    ];
+    for (const [name, fn] of steps) {
+        try {
+            await fn();
+            const size = fs.existsSync(file) ? fs.statSync(file).size : 0;
+            if (!size) throw new Error("ফাইল খালি");
+            if (size > MAX_BYTES) throw new Error("ফাইল ২৫MB এর বেশি");
+            return { ok: true, info, errors };
+        } catch (e) {
+            try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch (e2) {}
+            errors.push(`${name}: ${String((e && e.message) || e).slice(0, 60)}`);
+        }
+    }
+    return { ok: false, info, errors };
+}
+
+module.exports.config = {
+    name: "song",
+    version: "4.2.0",
+    hasPermssion: 0,
+    credits: "NAZRUL (fixed)",
+    description: "গানের নাম বা YouTube লিংক দিলে সরাসরি গান পাঠায়",
+    commandCategory: "tiện ích",
+    usages: "[গানের নাম / লিংক]",
+    cooldowns: 5,
+    dependencies: { "axios": "", "yt-search": "" }
+};
+
+module.exports.run = async function ({ api, event, args }) {
+    const { threadID, messageID } = event;
+    const reply = (m) => api.sendMessage(m, threadID, messageID);
+    if (!args || args.length === 0) return reply("» গানের নাম বা YouTube লিংক লিখুন।\nউদাহরণ: song tum hi ho");
+
+    const keyword = args.join(" ").trim();
+    const dir = path.join(__dirname, "cache");
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+    const file = path.join(dir, `song_${Date.now()}_${Math.floor(Math.random() * 1000)}.m4a`);
+    const cleanup = () => { try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch (e) {} };
+
+    let waitID = null;
+    api.sendMessage("🎵 গান খুঁজছি, একটু অপেক্ষা করুন...", threadID, (err, info) => { if (!err && info) waitID = info.messageID; }, messageID);
+    const removeWait = () => { try { if (waitID) { const r = api.unsendMessage(waitID); if (r && r.catch) r.catch(() => {}); } } catch (e) {} };
+
+    try {
+        let video = null, query = null;
+        if (/^https?:\/\//i.test(keyword)) {
+            const m = keyword.match(/(?:v=|youtu\.be\/|shorts\/)([\w-]{11})/);
+            if (!m) { removeWait(); return reply("লিংকটা বুঝতে পারলাম না। YouTube লিংক দিন।"); }
+            const v = await ytSearch({ videoId: m[1] });
+            if (!v || !v.title) { removeWait(); return reply("ভিডিওটা পাওয়া যায়নি।"); }
+            video = { videoId: m[1], url: `https://youtube.com/watch?v=${m[1]}`, title: v.title, timestamp: v.timestamp, seconds: v.seconds, author: v.author };
+        } else {
+            const r = await ytSearch(keyword);
+            const list = r.videos || [];
+            video = list.find(v => v.seconds && v.seconds <= 1200) || list[0];
+            if (!video) { removeWait(); return reply("কোনো গান পাওয়া যায়নি, অন্য নামে চেষ্টা করুন।"); }
+            query = keyword;
+        }
+
+        api.setMessageReaction("⌛", messageID, () => {}, true);
+        const started = Date.now();
+        const res = await fetchSong(video, file, query);
+
+        if (!res.ok) {
+            removeWait();
+            api.setMessageReaction("❌", messageID, () => {}, true);
+            return reply(`গান নামাতে পারলাম না 😔\n🎵 ${video.title}\n🔗 ${video.url}\n\nকারণ:\n${res.errors.join("\n").slice(0, 400)}`);
+        }
+
+        api.setMessageReaction("✅", messageID, () => {}, true);
+        const title = (res.info && res.info.title) || video.title;
+        const by = (res.info && res.info.artist) || (video.author && video.author.name) || "";
+        return api.sendMessage(
+            {
+                body: `🎵 ${title}\n🎶 ${by}\n⏱️ ${video.timestamp || convertHMS(video.seconds)}\n⏱️ সময় লেগেছে: ${Math.floor((Date.now() - started) / 1000)} সেকেন্ড`,
+                attachment: fs.createReadStream(file)
+            },
+            threadID,
+            () => { cleanup(); removeWait(); },
+            messageID
+        );
+    } catch (e) {
+        cleanup();
+        removeWait();
+        return reply("একটু সমস্যা হয়েছে, কিছুক্ষণ পর আবার চেষ্টা করুন।\n" + String((e && e.message) || e).slice(0, 100));
+    }
+};
