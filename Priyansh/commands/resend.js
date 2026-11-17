@@ -1,12 +1,12 @@
-const axios = require("axios");
 const fs = require("fs-extra");
+const axios = require("axios");
 const path = require("path");
 
 module.exports.config = {
     name: "resend",
-    version: "2.2.0",
+    version: "3.0.0",
     hasPermssion: 0,
-    credits: "Tarek robot (fixed)",
+    credits: "SHAHADAT SAHU (ported)",
     description: "কেউ মেসেজ, ছবি বা ভয়েস মুছে দিলে বট আবার পাঠায়",
     commandCategory: "system",
     usages: "resend on | off",
@@ -14,99 +14,50 @@ module.exports.config = {
     dependencies: { "axios": "", "fs-extra": "" }
 };
 
-const MAX_BYTES = 25 * 1024 * 1024;
-const CACHE = path.join(__dirname, "cache", "resend");
-// মেসেজ আসার সময়ই সংযুক্তি নামিয়ে রাখি, কারণ পরে মুছলে ফেসবুকের লিংক মেয়াদ শেষ হয়ে যায়
-const store = new Map(); // messageID -> { name, text, files: [{ path, type }] }
-const KEEP_MS = 60 * 60 * 1000;
-
-function extFor(att) {
-    try {
-        const u = new URL(att.url);
-        const e = path.extname(u.pathname).replace(".", "").toLowerCase();
-        if (e && e.length <= 5) return e;
-    } catch (e) {}
-    return { photo: "jpg", video: "mp4", audio: "mp4", animated_image: "gif" }[att.type] || "bin";
-}
-
-async function saveAttachments(msgID, attachments) {
-    fs.ensureDirSync(CACHE);
-    const files = [];
-    const fails = [];
-    let i = 0;
-    for (const att of attachments || []) {
-        if (!att || !att.url || att.type === "sticker") continue;
-        i++;
-        const p = path.join(CACHE, `${msgID.replace(/[^a-zA-Z0-9]/g, "")}_${i}.${extFor(att)}`);
-        try {
-            let res = null;
-            for (let k = 0; k < 2 && !res; k++) {
-                try {
-                    res = await axios.get(att.url, { responseType: "arraybuffer", timeout: 60000, maxContentLength: MAX_BYTES, headers: { "User-Agent": "Mozilla/5.0", "Accept": "*/*" } });
-                } catch (e) { if (k === 1) throw e; await new Promise(r => setTimeout(r, 1500)); }
-            }
-            fs.writeFileSync(p, Buffer.from(res.data));
-            files.push({ path: p, type: att.type });
-        } catch (e) {
-            console.log("[resend] সংযুক্তি নামাতে পারিনি:", att.type, e && e.message);
-            fails.push(`${att.type}: ${String((e && e.message) || e).slice(0, 60)}`);
-        }
-    }
-    files.fails = fails;
-    return files;
-}
-
-function cleanupOld() {
-    const now = Date.now();
-    for (const [id, item] of store) {
-        if (now - item.at > KEEP_MS) {
-            item.files.forEach(f => { try { fs.unlinkSync(f.path); } catch (e) {} });
-            store.delete(id);
-        }
-    }
-}
+const logMessage = global.logMessage || (global.logMessage = new Map());
 
 module.exports.handleEvent = async function ({ event, api, Users }) {
     try {
-        const { messageID, senderID, threadID, body, type, attachments } = event;
-        const botID = String(api.getCurrentUserID());
+        const { threadID, messageID, senderID, body, attachments, type } = event;
+        if (!global.data.botID) global.data.botID = api.getCurrentUserID();
 
-        const threadSetting = (global.data && global.data.threadData && global.data.threadData.get(String(threadID))) || {};
-        if (threadSetting.resend === 0) return; // বন্ধ থাকলে কিছু করবে না
+        const data = (global.data.threadData && global.data.threadData.get(String(threadID))) || {};
+        if (data.resend === false || String(senderID) === String(global.data.botID)) return;
 
         if (type !== "message_unsend") {
-            if (String(senderID) === botID) return;
-            // মেসেজ এলেই সংরক্ষণ করো (টেক্সট ও সংযুক্তি)
-            const files = await saveAttachments(String(messageID), attachments);
-            const hadAtt = (attachments || []).filter(a => a && a.url && a.type !== "sticker").length;
-            store.set(String(messageID), { name: null, text: body || "", files, at: Date.now(), hadAtt, fails: files.fails || [] });
-            cleanupOld();
+            logMessage.set(String(messageID), { msgBody: body || "", attachment: attachments || [] });
             return;
         }
 
-        // মেসেজ মুছে ফেলা হয়েছে
-        if (String(senderID) === botID) return;
-        const item = store.get(String(messageID));
-        if (!item) return; // বট চালু হওয়ার আগের মেসেজ হলে কিছু জানা নেই
-        store.delete(String(messageID));
+        const msg = logMessage.get(String(messageID));
+        if (!msg) return;
+        logMessage.delete(String(messageID));
 
-        let name = "কেউ";
-        try { name = (await Users.getNameUser(senderID)) || name; } catch (e) {}
+        const userName = (await Users.getNameUser(senderID)) || "কেউ";
 
-        const hasFiles = item.files.length > 0;
-        const kind = hasFiles ? item.files.map(f => f.type === "audio" ? "ভয়েস" : f.type === "video" ? "ভিডিও" : f.type === "photo" ? "ছবি" : "ফাইল").join(", ") : "মেসেজ";
-        let text = `${name} একটা ${kind} মুছে দিয়েছে।` + (item.text ? `\nলেখা: ${item.text}` : "");
-        if (!hasFiles && item.hadAtt > 0) {
-            const why = (item.fails && item.fails.length) ? item.fails.join("; ") : "বট এই মেসেজটা সংরক্ষণ করতে পারেনি (সম্ভবত বট চালু হওয়ার আগে পাঠানো বা মেসেজ আসার পর বট পুনরায় চালু হয়েছে)";
-            text += `\n⚠️ ছবি/ভয়েস ফিরিয়ে আনা গেলো না: ${why}`;
+        if (!msg.attachment || msg.attachment.length === 0) {
+            return api.sendMessage(`সবাই দেখেন নাও\n${userName} রিমুভ করেছে:\n${msg.msgBody || ""}`, threadID);
         }
 
-        if (!hasFiles) return api.sendMessage(text, threadID);
+        const dir = path.join(__dirname, "cache");
+        fs.ensureDirSync(dir);
+        const list = [];
+        const tmp = [];
+        let count = 0;
+        for (const file of msg.attachment) {
+            if (!file || !file.url || file.type === "sticker") continue;
+            count++;
+            const ext = (file.url.split("?")[0].split(".").pop() || "bin").slice(0, 5);
+            const p = path.join(dir, `resend_${Date.now()}_${count}.${ext}`);
+            const res = await axios.get(file.url, { responseType: "arraybuffer", timeout: 60000, headers: { "User-Agent": "Mozilla/5.0" } });
+            fs.writeFileSync(p, Buffer.from(res.data));
+            list.push(fs.createReadStream(p));
+            tmp.push(p);
+        }
 
-        const attachment = item.files.map(f => fs.createReadStream(f.path));
-        return api.sendMessage({ body: text, attachment }, threadID, () => {
-            item.files.forEach(f => { try { fs.unlinkSync(f.path); } catch (e) {} });
-        });
+        const cleanup = () => tmp.forEach(p => { try { fs.unlinkSync(p); } catch (e) {} });
+        if (!list.length) return api.sendMessage(`সবাই দেখেন নাও\n${userName} রিমুভ করেছে:\n${msg.msgBody || ""}`, threadID);
+        return api.sendMessage({ body: `সবাই দেখেন নাও\n${userName} রিমুভ করেছে:\n${msg.msgBody || ""}`, attachment: list }, threadID, cleanup);
     } catch (e) {
         console.log("[resend] এরর:", e && e.message || e);
     }
@@ -114,14 +65,13 @@ module.exports.handleEvent = async function ({ event, api, Users }) {
 
 module.exports.run = async function ({ api, event, args }) {
     const { threadID, messageID } = event;
-    const arg = String((args && args[0]) || "").toLowerCase();
-    if (!global.data || !global.data.threadData) return api.sendMessage("এখন চালু করা যাচ্ছে না।", threadID, messageID);
+    const action = String((args && args[0]) || "").toLowerCase();
+    if (!global.data.threadData) global.data.threadData = new Map();
     const tid = String(threadID);
     const cur = global.data.threadData.get(tid) || {};
-    if (arg === "on") cur.resend = 1;
-    else if (arg === "off") cur.resend = 0;
-    else return api.sendMessage(`ব্যবহার: resend on / resend off\nএখন: ${cur.resend === 0 ? "off" : "on"}`, threadID, messageID);
+    if (action === "on") cur.resend = true;
+    else if (action === "off") cur.resend = false;
+    else return api.sendMessage(`🔄 Resend: ${cur.resend === false ? "OFF" : "ON"}\nব্যবহার: resend on | off`, threadID, messageID);
     global.data.threadData.set(tid, cur);
-    return api.sendMessage(`resend ${arg === "on" ? "চালু" : "বন্ধ"} হয়েছে।`, threadID, messageID);
+    return api.sendMessage(`✅ Resend: ${cur.resend ? "ON" : "OFF"}`, threadID, messageID);
 };
-			
