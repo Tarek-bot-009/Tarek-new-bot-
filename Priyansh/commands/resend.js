@@ -4,7 +4,7 @@ const path = require("path");
 
 module.exports.config = {
     name: "resend",
-    version: "2.1.0",
+    version: "2.2.0",
     hasPermssion: 0,
     credits: "Tarek robot (fixed)",
     description: "কেউ মেসেজ, ছবি বা ভয়েস মুছে দিলে বট আবার পাঠায়",
@@ -32,6 +32,7 @@ function extFor(att) {
 async function saveAttachments(msgID, attachments) {
     fs.ensureDirSync(CACHE);
     const files = [];
+    const fails = [];
     let i = 0;
     for (const att of attachments || []) {
         if (!att || !att.url || att.type === "sticker") continue;
@@ -48,8 +49,10 @@ async function saveAttachments(msgID, attachments) {
             files.push({ path: p, type: att.type });
         } catch (e) {
             console.log("[resend] সংযুক্তি নামাতে পারিনি:", att.type, e && e.message);
+            fails.push(`${att.type}: ${String((e && e.message) || e).slice(0, 60)}`);
         }
     }
+    files.fails = fails;
     return files;
 }
 
@@ -75,7 +78,8 @@ module.exports.handleEvent = async function ({ event, api, Users }) {
             if (String(senderID) === botID) return;
             // মেসেজ এলেই সংরক্ষণ করো (টেক্সট ও সংযুক্তি)
             const files = await saveAttachments(String(messageID), attachments);
-            store.set(String(messageID), { name: null, text: body || "", files, at: Date.now() });
+            const hadAtt = (attachments || []).filter(a => a && a.url && a.type !== "sticker").length;
+            store.set(String(messageID), { name: null, text: body || "", files, at: Date.now(), hadAtt, fails: files.fails || [] });
             cleanupOld();
             return;
         }
@@ -91,7 +95,11 @@ module.exports.handleEvent = async function ({ event, api, Users }) {
 
         const hasFiles = item.files.length > 0;
         const kind = hasFiles ? item.files.map(f => f.type === "audio" ? "ভয়েস" : f.type === "video" ? "ভিডিও" : f.type === "photo" ? "ছবি" : "ফাইল").join(", ") : "মেসেজ";
-        const text = `${name} একটা ${kind} মুছে দিয়েছে।` + (item.text ? `\nলেখা: ${item.text}` : "");
+        let text = `${name} একটা ${kind} মুছে দিয়েছে।` + (item.text ? `\nলেখা: ${item.text}` : "");
+        if (!hasFiles && item.hadAtt > 0) {
+            const why = (item.fails && item.fails.length) ? item.fails.join("; ") : "বট এই মেসেজটা সংরক্ষণ করতে পারেনি (সম্ভবত বট চালু হওয়ার আগে পাঠানো বা মেসেজ আসার পর বট পুনরায় চালু হয়েছে)";
+            text += `\n⚠️ ছবি/ভয়েস ফিরিয়ে আনা গেলো না: ${why}`;
+        }
 
         if (!hasFiles) return api.sendMessage(text, threadID);
 
@@ -116,4 +124,4 @@ module.exports.run = async function ({ api, event, args }) {
     global.data.threadData.set(tid, cur);
     return api.sendMessage(`resend ${arg === "on" ? "চালু" : "বন্ধ"} হয়েছে।`, threadID, messageID);
 };
-	
+			
