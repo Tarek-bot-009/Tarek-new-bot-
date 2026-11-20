@@ -4,126 +4,83 @@ const path = require("path");
 
 module.exports.config = {
   name: "needgf",
-  version: "1.0.0",
+  version: "4.0.0",
   hasPermssion: 0,
-  credits: "MOHAMMAD AKASH",
-  description: "Gf profile picture",
-  commandCategory: "Fun",
+  credits: "MOHAMMAD AKASH / fixed",
+  description: "Random girl profile picture",
+  commandCategory: "fun",
   usages: "",
-  cooldowns: 10
+  cooldowns: 10,
+  dependencies: {
+    "axios": "",
+    "fs-extra": ""
+  }
 };
 
 module.exports.run = async function ({ api, event }) {
-  let filePath;
+  let filePath = null;
 
   try {
-    const apiUrl = Buffer.from(
-      "aHR0cHM6Ly9yYXNpbi1hcGlzLm9ucmVuZGVyLmNvbQ==",
-      "base64"
-    ).toString("utf8");
+    const cacheDir = path.join(__dirname, "cache");
+    await fs.ensureDir(cacheDir);
 
-    const apiKey = Buffer.from(
-      "cnNfaGVpNTJjbTgtbzRvai11Y2ZjLTR2N2MtZzE=",
-      "base64"
-    ).toString("utf8");
+    // Old rasin-apis endpoint was returning 404, so use a working
+    // public random-user image endpoint instead.
+    const apiResponse = await axios.get(
+      "https://randomuser.me/api/?gender=female&inc=picture&noinfo",
+      { timeout: 15000 }
+    );
 
-    const url = `${apiUrl}/api/rasin/gf?apikey=${apiKey}`;
-
-    // API থেকে তথ্য নেওয়া
-    const response = await axios.get(url, {
-      timeout: 15000
-    });
-
-    console.log("[needgf API]", response.data);
-
-    const imageUrl = response.data?.data?.url;
+    const imageUrl = apiResponse.data?.results?.[0]?.picture?.large;
 
     if (!imageUrl) {
       return api.sendMessage(
-        "⚠️ API থেকে ছবি পাওয়া যায়নি!",
+        "⚠️ ছবি পাওয়া যায়নি ভাই 😭 আবার চেষ্টা করো!",
         event.threadID,
         event.messageID
       );
     }
 
-    // temp folder
-    const tempDir = path.join(__dirname, "..", "..", "temp");
-    await fs.ensureDir(tempDir);
-
     filePath = path.join(
-      tempDir,
+      cacheDir,
       `needgf_${event.senderID}_${Date.now()}.jpg`
     );
 
-    // ছবি download
-    const image = await axios.get(imageUrl, {
+    const imageResponse = await axios.get(imageUrl, {
       responseType: "arraybuffer",
-      timeout: 20000
+      timeout: 20000,
+      maxRedirects: 5
     });
 
-    await fs.writeFile(filePath, image.data);
-
-    const msg = {
-      body:
-        "🌸✨ আপনার ভাগ্য জেগেছে ভাই!\n" +
-        "এমন সুন্দরী গফ সবাই পায় না 💕\n" +
-        "👇 নিচে দেখুন আপনার গফের প্রোফাইল 😚",
-
-      attachment: fs.createReadStream(filePath)
-    };
-
-    // Facebook-এ পাঠানো
-    await new Promise((resolve, reject) => {
-      api.sendMessage(msg, event.threadID, event.messageID, (err) => {
-        if (err) return reject(err);
-        resolve();
-      });
-    });
-
-  } catch (error) {
-
-    console.error(
-      "\n========== NEEDGF ERROR =========="
-    );
-
-    console.error(
-      "Message:",
-      error.message
-    );
-
-    if (error.response) {
-      console.error(
-        "Status:",
-        error.response.status
-      );
-
-      console.error(
-        "Data:",
-        error.response.data
-      );
-    }
-
-    console.error(
-      "=================================\n"
-    );
+    await fs.writeFile(filePath, imageResponse.data);
 
     return api.sendMessage(
-      `⚠️ needgf কাজ করছে না!\n\nError: ${error.message}`,
+      {
+        body:
+          "🌸✨ আপনার ভাগ্য জেগেছে ভাই!\n" +
+          "এমন সুন্দরী গফ সবাই পায় না 💕\n" +
+          "👇 নিচে দেখুন আপনার গফের প্রোফাইল 😚",
+        attachment: fs.createReadStream(filePath)
+      },
+      event.threadID,
+      () => {
+        if (filePath) {
+          fs.remove(filePath).catch(() => {});
+        }
+      },
+      event.messageID
+    );
+  } catch (error) {
+    console.error("[needgf]", error.response?.status || error.message);
+
+    if (filePath) {
+      await fs.remove(filePath).catch(() => {});
+    }
+
+    return api.sendMessage(
+      "⚠️ ছবি আনতে সমস্যা হয়েছে ভাই 😭 একটু পরে আবার চেষ্টা করো!",
       event.threadID,
       event.messageID
     );
-
-  } finally {
-
-    // পাঠানোর পর temporary image মুছে দেওয়া
-    if (filePath) {
-      setTimeout(async () => {
-        try {
-          if (await fs.pathExists(filePath)) {
-            await fs.remove(filePath);
-          }
-        } catch (e) {}
-      }, 5000);
-    }
   }
 };
