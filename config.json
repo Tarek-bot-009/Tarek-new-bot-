@@ -9,7 +9,8 @@
     "autoClean": true,
     "commandDisabled": [
         "sim.js",
-        "autotime.js"
+        "autotime.js",
+        "autosend.js"
     ],
     "eventDisabled": [
         "join.js"
