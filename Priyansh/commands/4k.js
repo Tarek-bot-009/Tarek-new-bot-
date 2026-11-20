@@ -1,71 +1,70 @@
-const axios = require('axios');
-const fs = require('fs');
+const axios = require("axios");
+const fs = require("fs-extra");
+const path = require("path");
 
-module.exports = {
-  config: {
+const BASE_URL_SOURCE = "https://raw.githubusercontent.com/mahmudx7/HINATA/main/baseApiUrl.json";
+
+module.exports.config = {
     name: "4k",
-    version: "1.0.0",
+    version: "1.8.0",
     hasPermssion: 0,
-    credits: "SHAHADAT SAHU", //don't change credit
-    description: "Enhance Photo - Reply with image to upscale",
-    commandCategory: "Image Editing Tools",
-    usages: "Reply to an image",
-    cooldowns: 5
-  },
-
-  handleEvent: async ({ api, event }) => {
-    const { body, messageReply, threadID, messageID } = event;
-    if (body?.toLowerCase().trim() === "4k") {
-      if (!messageReply?.attachments?.length)
-        return api.sendMessage("📸 Please reply to an image!", threadID, messageID);
-
-      await processImage(api, threadID, messageID, messageReply);
-    }
-  },
-
-  run: async ({ api, event }) => {
-    const { threadID, messageID, messageReply } = event;
-    if (!messageReply?.attachments?.length)
-      return api.sendMessage("📸 Reply to an image to enhance!", threadID, messageID);
-
-    await processImage(api, threadID, messageID, messageReply);
-  }
+    credits: "MahMUD (fixed)",
+    description: "ছবির মান বাড়ায় (4K AI)। ছবিতে রিপ্লাই দাও বা ছবির লিংক দাও।",
+    commandCategory: "AI",
+    usages: "[ছবির লিংক] বা ছবিতে রিপ্লাই",
+    cooldowns: 10,
+    dependencies: { "axios": "", "fs-extra": "" }
 };
 
-async function processImage(api, threadID, messageID, messageReply) {
-  const tempPath = __dirname + "/cache/4k.jpg";
-  const img = messageReply.attachments[0].url;
-
-  try {
-    const configUrl =
-      "https://raw.githubusercontent.com/shahadat-sahu/SAHU-API/refs/heads/main/SAHU-API.json";
-
-    const apiConfig = await axios.get(configUrl);
-    const apiUrl = apiConfig.data["4k"];
-
-    const wait = await api.sendMessage("⏳ Enhancing your photo in 4K...", threadID);
-
-    const enhanceUrl = `${apiUrl}?imageUrl=${encodeURIComponent(img)}`;
-    const res = await axios.get(enhanceUrl);
-    const resultImg = res.data?.result;
-
-    if (!resultImg) throw new Error("No result");
-
-    const buffer = (await axios.get(resultImg, { responseType: "arraybuffer" })).data;
-    fs.writeFileSync(tempPath, Buffer.from(buffer, "binary"));
-
-    api.sendMessage(
-      {
-        body: "✔️ 4K Enhance Successful!",
-        attachment: fs.createReadStream(tempPath)
-      },
-      threadID,
-      () => fs.unlinkSync(tempPath),
-      messageID
-    );
-
-    api.unsendMessage(wait.messageID);
-  } catch (e) {
-    api.sendMessage("❌ API Error! Boss SAHU ke message din!", threadID, messageID);
-  }
+// বাইরের API ঠিকানা আনা
+async function getApiBase() {
+    const r = await axios.get(BASE_URL_SOURCE, { timeout: 10000 });
+    const base = r.data && r.data.mahmud;
+    if (!base) throw new Error("API ঠিকানা পাওয়া যায়নি");
+    return String(base).replace(/\/+$/, "");
 }
+
+module.exports.run = async function ({ api, event, args }) {
+    const { threadID, messageID } = event;
+    const reply = (m) => api.sendMessage(m, threadID, messageID);
+
+    // ছবির লিংক: রিপ্লাই করা ছবি, না হলে দেওয়া লিংক
+    let imgUrl = null;
+    const rep = event.messageReply && event.messageReply.attachments && event.messageReply.attachments[0];
+    if (rep && rep.type === "photo") imgUrl = rep.url;
+    else if (args && args[0]) imgUrl = args.join(" ").trim();
+
+    if (!imgUrl) return reply("একটা ছবিতে রিপ্লাই দাও, অথবা ছবির লিংক দাও।\nউদাহরণ: 4k https://...jpg");
+    if (!/^https?:\/\//i.test(imgUrl)) return reply("ছবির লিংকটা ঠিক নয় (http বা https দিয়ে শুরু হতে হবে)।");
+
+    const cacheDir = path.join(__dirname, "cache");
+    const outPath = path.join(cacheDir, `4k_${Date.now()}_${Math.floor(Math.random() * 1000)}.png`);
+    const cleanup = () => { try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch (e) {} };
+
+    let waitID = null;
+    api.sendMessage("⏳ ছবির মান বাড়াচ্ছি, একটু অপেক্ষা করো...", threadID, (err, info) => { if (!err && info) waitID = info.messageID; }, messageID);
+    const removeWait = () => { try { if (waitID) { const r = api.unsendMessage(waitID); if (r && r.catch) r.catch(() => {}); } } catch (e) {} };
+
+    try {
+        const base = await getApiBase();
+        const apiUrl = `${base}/api/hd?imgUrl=${encodeURIComponent(imgUrl)}`;
+        const res = await axios.get(apiUrl, { responseType: "arraybuffer", timeout: 60000 });
+        const buf = Buffer.from(res.data);
+        if (!buf.length) throw new Error("খালি উত্তর");
+
+        fs.ensureDirSync(cacheDir);
+        fs.writeFileSync(outPath, buf);
+        removeWait();
+        return api.sendMessage(
+            { body: "✅ তোমার ছবির মান বাড়ানো হয়েছে।", attachment: fs.createReadStream(outPath) },
+            threadID,
+            () => cleanup(),
+            messageID
+        );
+    } catch (e) {
+        removeWait();
+        cleanup();
+        console.log("[4k error]", e && e.message || e);
+        return reply("😔 ছবির মান বাড়ানো যায়নি। API সার্ভার বন্ধ থাকতে পারে, একটু পরে আবার চেষ্টা করো।");
+    }
+};
