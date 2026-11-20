@@ -19,7 +19,7 @@ const fs = require("fs-extra");
 const path = require("path");
 const axios = require("axios");
 
-const OWNER_CREDIT = "乛 M𝆠፝֟R ཐི༏ཋྀ JU𝆠፝֟W𝆠፝֟ELꜛཐི༏ཋྀ࿐";
+const OWNER_CREDIT = "Tarek sarker";
 
 function creditOk() {
   return module.exports.config.credits === OWNER_CREDIT;
