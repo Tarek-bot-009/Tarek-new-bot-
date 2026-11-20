@@ -6,16 +6,17 @@ const BASE_URL_SOURCE = "https://raw.githubusercontent.com/mahmudx7/HINATA/main/
 
 module.exports.config = {
     name: "4k",
-    version: "1.9.0",
+    version: "1.8.0",
     hasPermssion: 0,
     credits: "MahMUD (fixed)",
     description: "ছবির মান বাড়ায় (4K AI)। ছবিতে রিপ্লাই দাও বা ছবির লিংক দাও।",
     commandCategory: "AI",
     usages: "[ছবির লিংক] বা ছবিতে রিপ্লাই",
     cooldowns: 10,
-    dependencies: { "axios": "", "fs-extra": "", "jimp": "" }
+    dependencies: { "axios": "", "fs-extra": "" }
 };
 
+// বাইরের API ঠিকানা আনা
 async function getApiBase() {
     const r = await axios.get(BASE_URL_SOURCE, { timeout: 10000 });
     const base = r.data && r.data.mahmud;
@@ -27,6 +28,7 @@ module.exports.run = async function ({ api, event, args }) {
     const { threadID, messageID } = event;
     const reply = (m) => api.sendMessage(m, threadID, messageID);
 
+    // ছবির লিংক: রিপ্লাই করা ছবি, না হলে দেওয়া লিংক
     let imgUrl = null;
     const rep = event.messageReply && event.messageReply.attachments && event.messageReply.attachments[0];
     if (rep && rep.type === "photo") imgUrl = rep.url;
@@ -60,30 +62,9 @@ module.exports.run = async function ({ api, event, args }) {
             messageID
         );
     } catch (e) {
-        try {
-            const Jimp = require("jimp");
-            const src = await axios.get(imgUrl, { responseType: "arraybuffer", timeout: 30000 });
-            const img = await Jimp.read(Buffer.from(src.data));
-            const w = img.bitmap.width, h = img.bitmap.height;
-            let f = 2;
-            if (Math.max(w, h) * f > 2400) f = Math.max(1, 2400 / Math.max(w, h));
-            if (f > 1) img.resize(Math.round(w * f), Math.round(h * f), Jimp.RESIZE_BICUBIC);
-            img.convolute([[0, -1, 0], [-1, 5, -1], [0, -1, 0]]);
-            img.contrast(0.05);
-            fs.ensureDirSync(cacheDir);
-            await img.quality(92).writeAsync(outPath);
-            removeWait();
-            return api.sendMessage(
-                { body: "✅ ছবির মান বাড়ানো হয়েছে (বিকল্প পদ্ধতি)।", attachment: fs.createReadStream(outPath) },
-                threadID,
-                () => cleanup(),
-                messageID
-            );
-        } catch (e2) {
-            removeWait();
-            cleanup();
-            console.log("[4k error]", e && e.message || e, "| fallback:", e2 && e2.message || e2);
-            return reply("😔 ছবির মান বাড়ানো যায়নি। ছবির লিংক ঠিক আছে কি না দেখো, অথবা একটু পরে চেষ্টা করো।");
-        }
+        removeWait();
+        cleanup();
+        console.log("[4k error]", e && e.message || e);
+        return reply("😔 ছবির মান বাড়ানো যায়নি। API সার্ভার বন্ধ থাকতে পারে, একটু পরে আবার চেষ্টা করো।");
     }
 };
