@@ -2,103 +2,125 @@ const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
 
-function decode(b64) {
-  return Buffer.from(b64, "base64").toString("utf-8");
-}
-
 module.exports.config = {
   name: "needgf",
-  version: "3.0.2",
+  version: "1.0.0",
   hasPermssion: 0,
   credits: "MOHAMMAD AKASH",
-  description: "তোর Gf এর প্রোফাইল পিক দেখায় 😍",
-  commandCategory: "fun",
+  description: "Gf profile picture",
+  commandCategory: "Fun",
   usages: "",
   cooldowns: 10
 };
 
-module.exports.languages = {
-  en: {
-    success: "🌸✨ আপনার ভাগ্য জেগেছে ভাই!\nএমন সুন্দরী গফ সবাই পায় না 💕\n👇 নিচে দেখুন আপনার গফের প্রোফাইল 😚",
-    noImage: "⚠️ ছবি পাওয়া যায়নি ভাই 😭 আবার চেষ্টা করো!",
-    error: "⚠️ কিছু একটা গন্ডগোল হইছে ভাই 😭 পরে আবার চেষ্টা করো!"
-  }
-};
-
-module.exports.run = async function ({ api, event, getText }) {
-  let imgPath = null;
+module.exports.run = async function ({ api, event }) {
+  let filePath;
 
   try {
-    const apiUrl = decode(
-      "aHR0cHM6Ly9yYXNpbi1hcGlzLm9ucmVuZGVyLmNvbQ=="
-    );
+    const apiUrl = Buffer.from(
+      "aHR0cHM6Ly9yYXNpbi1hcGlzLm9ucmVuZGVyLmNvbQ==",
+      "base64"
+    ).toString("utf8");
 
-    const apiKey = decode(
-      "cnNfaGVpNTJjbTgtbzRvai11Y2ZjLTR2N2MtZzE="
-    );
+    const apiKey = Buffer.from(
+      "cnNfaGVpNTJjbTgtbzRvai11Y2ZjLTR2N2MtZzE=",
+      "base64"
+    ).toString("utf8");
 
-    const fullUrl = `${apiUrl}/api/rasin/gf?apikey=${apiKey}`;
+    const url = `${apiUrl}/api/rasin/gf?apikey=${apiKey}`;
 
-    const response = await axios.get(fullUrl, {
+    // API থেকে তথ্য নেওয়া
+    const response = await axios.get(url, {
       timeout: 15000
     });
 
-    const imgUrl = response.data?.data?.url;
+    console.log("[needgf API]", response.data);
 
-    if (!imgUrl) {
+    const imageUrl = response.data?.data?.url;
+
+    if (!imageUrl) {
       return api.sendMessage(
-        getText("noImage"),
+        "⚠️ API থেকে ছবি পাওয়া যায়নি!",
         event.threadID,
         event.messageID
       );
     }
 
-    const tmpDir = path.join(__dirname, "tmp");
+    // temp folder
+    const tempDir = path.join(__dirname, "..", "..", "temp");
+    await fs.ensureDir(tempDir);
 
-    await fs.ensureDir(tmpDir);
-
-    imgPath = path.join(
-      tmpDir,
-      `${event.senderID}_gf_${Date.now()}.jpg`
+    filePath = path.join(
+      tempDir,
+      `needgf_${event.senderID}_${Date.now()}.jpg`
     );
 
-    const imageResponse = await axios.get(imgUrl, {
+    // ছবি download
+    const image = await axios.get(imageUrl, {
       responseType: "arraybuffer",
-      timeout: 20000,
-      maxRedirects: 5
+      timeout: 20000
     });
 
-    await fs.writeFile(imgPath, imageResponse.data);
+    await fs.writeFile(filePath, image.data);
 
-    const message = {
-      body: getText("success"),
-      attachment: fs.createReadStream(imgPath)
+    const msg = {
+      body:
+        "🌸✨ আপনার ভাগ্য জেগেছে ভাই!\n" +
+        "এমন সুন্দরী গফ সবাই পায় না 💕\n" +
+        "👇 নিচে দেখুন আপনার গফের প্রোফাইল 😚",
+
+      attachment: fs.createReadStream(filePath)
     };
 
-    return api.sendMessage(
-      message,
-      event.threadID,
-      event.messageID
-    );
+    // Facebook-এ পাঠানো
+    await new Promise((resolve, reject) => {
+      api.sendMessage(msg, event.threadID, event.messageID, (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
 
   } catch (error) {
+
     console.error(
-      "[NEEDGF ERROR]",
-      error.response?.status || error.message
+      "\n========== NEEDGF ERROR =========="
+    );
+
+    console.error(
+      "Message:",
+      error.message
+    );
+
+    if (error.response) {
+      console.error(
+        "Status:",
+        error.response.status
+      );
+
+      console.error(
+        "Data:",
+        error.response.data
+      );
+    }
+
+    console.error(
+      "=================================\n"
     );
 
     return api.sendMessage(
-      getText("error"),
+      `⚠️ needgf কাজ করছে না!\n\nError: ${error.message}`,
       event.threadID,
       event.messageID
     );
 
   } finally {
-    if (imgPath) {
+
+    // পাঠানোর পর temporary image মুছে দেওয়া
+    if (filePath) {
       setTimeout(async () => {
         try {
-          if (await fs.pathExists(imgPath)) {
-            await fs.remove(imgPath);
+          if (await fs.pathExists(filePath)) {
+            await fs.remove(filePath);
           }
         } catch (e) {}
       }, 5000);
