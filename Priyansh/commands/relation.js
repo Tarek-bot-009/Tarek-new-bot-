@@ -6,10 +6,11 @@ const TOKEN = "6628568379%7Cc1e620fa708a1d5696fb991c1bde5662";
 // উপরের স্লট (টেমপ্লেটের যে জায়গায় ছবি বসবে)
 const TOP_SLOT = { x: 0, y: 0, w: 394, h: 419 };
 const TEMPLATE_NAME = "relation_bg.png";
+const TEMPLATE_URL = "https://i.ibb.co.com/0z785M6/Picsart-26-09-09-06-29-31-062.png";
 
 module.exports.config = {
     name: "relation",
-    version: "2.0.0",
+    version: "2.1.0",
     hasPermssion: 0,
     credits: "EryXenX (fixed)",
     description: "যাকে ট্যাগ বা রিপ্লাই করা হয় তার প্রোফাইল ছবি মজার মিম টেমপ্লেটে বসায়",
@@ -39,7 +40,16 @@ module.exports.run = async function ({ api, event, args }) {
     const outPath = path.join(cacheDir, `relation_${Date.now()}_${Math.floor(Math.random() * 1000)}.png`);
     const cleanup = () => { try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch (e) {} };
 
-    if (!fs.existsSync(tplPath)) return reply("❌ মিম টেমপ্লেট পাওয়া যায়নি। cache ফোল্ডারে relation_bg.png আপলোড করো।");
+    // টেমপ্লেট না থাকলে একবার বাইরের লিংক থেকে নামিয়ে cache এ রাখে
+    if (!fs.existsSync(tplPath)) {
+        try {
+            const t = await axios.get(TEMPLATE_URL, { responseType: "arraybuffer", timeout: 30000 });
+            fs.ensureDirSync(cacheDir);
+            fs.writeFileSync(tplPath, Buffer.from(t.data));
+        } catch (e) {
+            return reply("❌ মিম টেমপ্লেট নামাতে পারলাম না। একটু পরে আবার চেষ্টা করো।");
+        }
+    }
 
     try {
         const avRes = await axios.get(`https://graph.facebook.com/${targetID}/picture?height=720&width=720&access_token=${TOKEN}`, { responseType: "arraybuffer", timeout: 20000 });
@@ -67,3 +77,4 @@ module.exports.run = async function ({ api, event, args }) {
         return reply("❌ তৈরি করতে সমস্যা হয়েছে। আবার চেষ্টা করো।");
     }
 };
+                
