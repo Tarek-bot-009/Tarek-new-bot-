@@ -4,12 +4,13 @@ const path = require("path");
 
 const TOKEN = "6628568379%7Cc1e620fa708a1d5696fb991c1bde5662";
 const TEMPLATE_NAME = "xray_bg.jpg";
+const TEMPLATE_URL = "https://i.ibb.co.com/bRYqX9ms/Picsart-26-05-17-11-24-23-181.jpg";
 // টেমপ্লেটের যে জায়গায় প্রোফাইল ছবি বসবে (ছবির মাপের সাথে মিলিয়ে বদলানো যাবে)
 const FRAME = { x: 0.5, y: 0, w: 0.5, h: 1 }; // আনুপাতিক: ডান অর্ধেক পুরো উচ্চতা
 
 module.exports.config = {
     name: "xray",
-    version: "2.0.0",
+    version: "2.1.0",
     hasPermssion: 0,
     credits: "EryXenX (fixed)",
     description: "যাকে ট্যাগ বা রিপ্লাই করা হয় তার প্রোফাইল ছবি এক্স-রে টেমপ্লেটে বসায় (মজার জন্য)",
@@ -33,7 +34,16 @@ module.exports.run = async function ({ api, event }) {
     const outPath = path.join(cacheDir, `xray_${Date.now()}_${Math.floor(Math.random() * 1000)}.jpg`);
     const cleanup = () => { try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch (e) {} };
 
-    if (!fs.existsSync(tplPath)) return reply("❌ এক্স-রে টেমপ্লেট পাওয়া যায়নি। cache ফোল্ডারে xray_bg.jpg আপলোড করো।");
+    // টেমপ্লেট না থাকলে একবার বাইরের লিংক থেকে নামিয়ে cache এ রাখে
+    if (!fs.existsSync(tplPath)) {
+        try {
+            const t = await axios.get(TEMPLATE_URL, { responseType: "arraybuffer", timeout: 30000 });
+            fs.ensureDirSync(cacheDir);
+            fs.writeFileSync(tplPath, Buffer.from(t.data));
+        } catch (e) {
+            return reply("❌ এক্স-রে টেমপ্লেট নামাতে পারলাম না। একটু পরে আবার চেষ্টা করো।");
+        }
+    }
 
     try {
         const avRes = await axios.get(`https://graph.facebook.com/${targetID}/picture?height=1000&width=1000&access_token=${TOKEN}`, { responseType: "arraybuffer", timeout: 20000 });
@@ -63,3 +73,4 @@ module.exports.run = async function ({ api, event }) {
         return reply("❌ তৈরি করতে সমস্যা হয়েছে। আবার চেষ্টা করো।");
     }
 };
+                                                
