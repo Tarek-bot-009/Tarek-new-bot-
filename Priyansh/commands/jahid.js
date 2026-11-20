@@ -27,7 +27,7 @@ module.exports.config = {
 module.exports.handleEvent = async ({ api, event, Threads }) => {
   const content = event.body ? event.body : '';
     const body = content.toLowerCase();
-  if (body.startsWith("নোটিশ")) {
+  if (body.startsWith("জাহিদ")) {
     const rahad = [
       "এইটা হলো পটিয়ার মাস্তান পরোটা জাহেদ এখন রাস্তায় রাস্তায় পরোটা বিক্রি করে",
     
