@@ -99,11 +99,11 @@ module.exports.handleEvent = async function({ api, event, args, Threads, Users }
      return api.sendMessage("সাবধান এটা হলিউডের নায়িকা পাওয়ারি অন্য রকম ঢং করার জন্য সেরা রে আর আমার বস তারেক সরকার ওরে মনে মনে চাই..!😹🍊⛏️", threadID);
    };
   
-  if ((event.body.toLowerCase() == "mim") || (event.body.toLowerCase() == "Arvi")) {
-     return api.sendMessage("এইটা হলো আমার বস তারেক সরকার এর বেস্টু 🥰🥰..!😠🥰⛏️", threadID);
+  if ((event.body.toLowerCase() == "হালফান") || (event.body.toLowerCase() == "Arvi")) {
+     return api.sendMessage("এইটা একটা লুচ্চা যেখানে মেয়ে দেখে সেখানেই চুমাচুমি শুরু করে🥰⛏️", threadID);
    };
 
-  if ((event.body.toLowerCase() == "lamiya") || (event.body.toLowerCase() == "nusrat")) {
+  if ((event.body.toLowerCase() == "mim") || (event.body.toLowerCase() == "nusrat")) {
      return api.sendMessage("খবরদার কেউ এই নাম দরে ডাক দিবা না এইটা অনেক হট মেয়ে..!😠🥰⛏️", threadID);
    };
 
@@ -135,7 +135,7 @@ module.exports.handleEvent = async function({ api, event, args, Threads, Users }
      return api.sendMessage("️আমার বাচ্চা তো তোমার গার্লফ্রেন্ডের পেটে..!!🌚⛏️🌶️ ", threadID);
    };
 
-   if ((event.body.toLowerCase() == "ইকবাল") || (event.body.toLowerCase() == "ss daw")) {
+   if ((event.body.toLowerCase() == "বার্গার ইকবাল") || (event.body.toLowerCase() == "ss daw")) {
      return api.sendMessage("️ এইটা হলো মরা মুরগ মিমের সাথে প্রেম করে কিন্তু কোনো কিছুই করতে পারে না", threadID);
    };
 
