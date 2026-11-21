@@ -1,27 +1,48 @@
+const fs = require("fs-extra");
+const path = require("path");
+
 module.exports.config = {
-	name: "dog",
-	version: "1.0.1",
-	hasPermssion: 0,
-	credits: "𝐏𝐫𝐢𝐲𝐚𝐧𝐬𝐡 𝐑𝐚𝐣𝐩𝐮𝐭",
-	description: "Xem Boss",
-	commandCategory: "Picture",
-	usages: "dog [Text]",
-	cooldowns: 1,
-	
-	};
-			
-module.exports.run = async ({ api, event }) => {
-	const axios = require('axios');
-	const request = require('request');
-	const fs = require("fs");
-	axios.get('https://nekos.life/api/v2/img/woof').then(res => {
-	let ext = res.data.url.substring(res.data.url.lastIndexOf(".") + 1);
-	
-	let callback = function () {
-					api.sendMessage({
-						attachment: fs.createReadStream(__dirname + `/cache/dog.${ext}`)
-					}, event.threadID, () => fs.unlinkSync(__dirname + `/cache/dog.${ext}`), event.messageID);
-				};
-				request(res.data.url).pipe(fs.createWriteStream(__dirname + `/cache/dog.${ext}`)).on("close", callback);
-			})
+  name: "dog",
+  version: "1.1.0",
+  hasPermssion: 0,
+  credits: "Taka Taka",
+  description: "ফানি ছবি পাঠায়",
+  commandCategory: "fun",
+  usages: "",
+  cooldowns: 5
+};
+
+module.exports.run = async function ({ api, event }) {
+  const imagePath = path.join(__dirname, "dog.webp");
+
+  try {
+    if (!fs.existsSync(imagePath)) {
+      return api.sendMessage(
+        "⚠️ dog ছবিটা পাওয়া যায়নি ভাই!",
+        event.threadID,
+        event.messageID
+      );
     }
+
+    const body =
+      "🐶 আরে ভাই কুকুরটারে দেখছেন? 😂\n" +
+      "এইটা ভাইয়ের VIP পাহারাদার! 😎\n" +
+      "🤣 বেশি কাছে যাইয়েন না, কামড় না দিলেও ভয় দেখাবে!";
+
+    return api.sendMessage(
+      {
+        body,
+        attachment: fs.createReadStream(imagePath)
+      },
+      event.threadID,
+      event.messageID
+    );
+  } catch (err) {
+    console.error("[dog]", err);
+    return api.sendMessage(
+      "⚠️ dog ছবিটা পাঠানো যাচ্ছে না!",
+      event.threadID,
+      event.messageID
+    );
+  }
+};
