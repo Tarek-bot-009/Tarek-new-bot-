@@ -8,15 +8,15 @@ const axios = global.nodemodule["axios"] || require("axios");
 const PICS = {
   "ইকবাল": {
     url: "https://i.imgur.com/qJWGNBm.jpeg",
-    caption: "ইকবাল আসছে, গ্রুপের মুড এখন অন 😎"
+    caption: "সারাদিন ঘুমাই রাত হলে গরু চুরি করে ইকবাল"
   },
   "জাহেদ": {
     url: "https://i.imgur.com/nepKsF4.jpeg",
-    caption: "জাহেদ ভাই আসলেই গ্রুপ জমে যায় 🔥"
+    caption: "এইটা হলো পরোটা জাহেদ 🔥"
   },
   "ঈশান": {
     url: "https://i.imgur.com/UkaUnhl.jpeg",
-    caption: "ঈশান নাম শুনলেই মনে হয় কিছু একটা ইমপ্রেসিভ হবে 😏"
+    caption: "হাজার বেডির দালাল ইচা মাছ"
   },
   "মায়া": {
     url: "https://i.imgur.com/sS1Mf0B.jpeg",
@@ -24,23 +24,23 @@ const PICS = {
   },
   "নাসিম": {
     url: "https://i.imgur.com/Fr4xhea.jpeg",
-    caption: "নাসিম এসেছে, এবার আর কেউ পালাতে পারবে না 😂"
+    caption: "নতুন মেয়ে দেখলেই ওয়াইফাই কানেক্ট করতে চাই"
   },
   "আনোয়ার": {
     url: "https://i.imgur.com/Ebs8zdV.jpeg",
-    caption: "আনোয়ার ভাই, গ্রুপের বড় ভাই, সম্মান দিয়ে দেখুন 🫡"
+    caption: "সারাদিন চিপায় থাকে"
   },
   "শিফা": {
     url: "https://i.imgur.com/Y8tkjtN.jpeg",
-    caption: "শিফা আসছে, লাইক দিতে ভুলবেন না 💅"
+    caption: "চকলেট এর হাসি বড্ড ভালুপাশি"
   },
   "মুন্না": {
     url: "https://i.imgur.com/Sge3XXH.jpeg",
-    caption: "মুন্না ভাইয়ের আসল রূপ আজও রহস্য 🤔"
+    caption: "মুন্না ভাইয়ের আসল রূপ আজও রহস্য "
   },
   "হালফান": {
     url: "https://i.imgur.com/xU7Z5pL.jpeg",
-    caption: "হালফান স্টেজে, সবাই তালি দিন 👏"
+    caption: "য়ালার পু আলা একটা লুচ্চা মেয়েদের মধু খাই"
   },
 };
 // ============================================================
