@@ -1,107 +1,362 @@
+const axios = require("axios");
+
 module.exports.config = {
   name: "uid3",
-  version: "4.0.0",
+  version: "5.0.0",
   hasPermssion: 0,
   credits: "ChatGPT",
-  description: "Get Facebook profile information from mentioned/replied user",
+  description: "Facebook/Messenger public profile information",
   commandCategory: "information",
-  usages: "uid3 @mention",
+  usages: "uid3 @mention | reply uid3",
   cooldowns: 5
 };
 
 module.exports.run = async function ({ api, event }) {
+
+  // ==========================================
+  // TARGET USER UID
+  // ==========================================
+
   let targetUID = null;
 
-  // 1️⃣ Reply করা মেসেজ থেকে UID
-  if (event.messageReply && event.messageReply.senderID) {
+  // Reply করলে যাকে reply করা হয়েছে
+  if (
+    event.messageReply &&
+    event.messageReply.senderID
+  ) {
     targetUID = event.messageReply.senderID;
   }
 
-  // 2️⃣ Mention থেকে UID
-  if (!targetUID && event.mentions && Object.keys(event.mentions).length > 0) {
+  // Mention করলে mention করা user
+  if (
+    !targetUID &&
+    event.mentions &&
+    Object.keys(event.mentions).length > 0
+  ) {
     targetUID = Object.keys(event.mentions)[0];
   }
 
-  // 3️⃣ কিছু না থাকলে নিজের UID
+  // কিছু না দিলে command sender
   if (!targetUID) {
     targetUID = event.senderID;
   }
 
+  // ==========================================
+  // GET MESSENGER USER INFO
+  // ==========================================
+
+  let user = null;
+
   try {
-    const info = await new Promise((resolve, reject) => {
+
+    user = await new Promise((resolve, reject) => {
+
       api.getUserInfo(targetUID, (err, data) => {
+
         if (err) return reject(err);
-        resolve(data);
+
+        if (!data || !data[targetUID]) {
+          return reject(
+            new Error("User information not found")
+          );
+        }
+
+        resolve(data[targetUID]);
       });
+
     });
 
-    const user = info && info[targetUID];
-
-    if (!user) {
-      return api.sendMessage(
-        "❌ এই ব্যক্তির তথ্য পাওয়া যায়নি।",
-        event.threadID,
-        event.messageID
-      );
-    }
-
-    const name = user.name || "পাওয়া যায়নি";
-    const uid = targetUID;
-    const profile = `https://www.facebook.com/profile.php?id=${uid}`;
-
-    const msg = `
-╭━━━━━━━━━━━━━━━━━━━━╮
-┃     🔎 FACEBOOK UID3
-╰━━━━━━━━━━━━━━━━━━━━╯
-
-👤 PROFILE INFORMATION
-━━━━━━━━━━━━━━━━━━━━
-📛 নাম        : ${name}
-🆔 UID        : ${uid}
-🔗 Profile    : ${profile}
-
-📊 FACEBOOK INFO
-━━━━━━━━━━━━━━━━━━━━
-📌 পোস্ট      : API থেকে পাওয়া যায়নি
-🎬 Reels      : API থেকে পাওয়া যায়নি
-🎥 Videos     : API থেকে পাওয়া যায়নি
-👥 Friends    : API থেকে পাওয়া যায়নি
-👤 Followers  : API থেকে পাওয়া যায়নি
-➕ Following  : API থেকে পাওয়া যায়নি
-
-ℹ️ অন্যান্য তথ্য
-━━━━━━━━━━━━━━━━━━━━
-📖 Bio        : API থেকে পাওয়া যায়নি
-🌍 Location   : API থেকে পাওয়া যায়নি
-💼 Work       : API থেকে পাওয়া যায়নি
-🎓 Education  : API থেকে পাওয়া যায়নি
-🔵 Verified   : API থেকে পাওয়া যায়নি
-
-━━━━━━━━━━━━━━━━━━━━
-⚠️ Messenger API যতটুকু
-তথ্য দেয়, শুধু সেটুকুই দেখানো হবে।
-━━━━━━━━━━━━━━━━━━━━`;
-
-    return api.sendMessage(msg, event.threadID, event.messageID);
-
   } catch (error) {
-    console.error("UID3 ERROR:", error);
+
+    console.error(
+      "UID3 USER ERROR:",
+      error.message
+    );
 
     return api.sendMessage(
-      `❌ তথ্য নেওয়া যায়নি।
+`❌ User information পাওয়া যায়নি।
 
-সম্ভাব্য কারণ:
-• User ID পাওয়া যায়নি
-• Facebook/Messenger API সীমাবদ্ধতা
-• Bot API request reject করেছে
+🆔 UID: ${targetUID}
 
-📌 ব্যবহার:
-/uid3 @User
-
-অথবা কারো মেসেজে Reply করে:
-/uid3`,
+সম্ভবত Messenger API এই user-এর
+profile information দিতে পারছে না।`,
       event.threadID,
       event.messageID
     );
   }
+
+  // ==========================================
+  // BASIC INFORMATION
+  // ==========================================
+
+  const name =
+    user.name ||
+    user.fullName ||
+    "পাওয়া যায়নি";
+
+  const uid =
+    targetUID;
+
+  const profileUrl =
+    user.profileUrl ||
+    `https://www.facebook.com/profile.php?id=${uid}`;
+
+  const firstName =
+    user.firstName ||
+    "পাওয়া যায়নি";
+
+  const vanity =
+    user.vanity ||
+    user.username ||
+    "পাওয়া যায়নি";
+
+  // ==========================================
+  // OPTIONAL FACEBOOK API
+  //
+  // চাইলে এখানে তোমার অনুমোদিত public-data API
+  // সেট করতে পারবে।
+  // ==========================================
+
+  let fb = {};
+
+  const API_URL =
+    process.env.FB_PROFILE_API;
+
+  if (API_URL) {
+
+    try {
+
+      const response =
+        await axios.get(API_URL, {
+          params: {
+            uid: uid,
+            id: uid
+          },
+
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0"
+          },
+
+          timeout: 15000
+        });
+
+      fb =
+        response.data?.data ||
+        response.data ||
+        {};
+
+    } catch (error) {
+
+      console.log(
+        "Facebook public API unavailable:",
+        error.message
+      );
+
+    }
+  }
+
+  // ==========================================
+  // HELPER
+  // ==========================================
+
+  const get = (...keys) => {
+
+    for (const key of keys) {
+
+      if (
+        fb[key] !== undefined &&
+        fb[key] !== null &&
+        fb[key] !== ""
+      ) {
+        return fb[key];
+      }
+
+      if (
+        user[key] !== undefined &&
+        user[key] !== null &&
+        user[key] !== ""
+      ) {
+        return user[key];
+      }
+    }
+
+    return "পাওয়া যায়নি";
+  };
+
+  // ==========================================
+  // FACEBOOK DATA
+  // ==========================================
+
+  const posts =
+    get(
+      "postsCount",
+      "postCount",
+      "posts"
+    );
+
+  const reels =
+    get(
+      "reelsCount",
+      "reelCount",
+      "reels"
+    );
+
+  const videos =
+    get(
+      "videosCount",
+      "videoCount",
+      "videos"
+    );
+
+  const friends =
+    get(
+      "friendsCount",
+      "friendCount"
+    );
+
+  const followers =
+    get(
+      "followersCount",
+      "followerCount",
+      "followers"
+    );
+
+  const following =
+    get(
+      "followingCount",
+      "following"
+    );
+
+  const photos =
+    get(
+      "photosCount",
+      "photoCount"
+    );
+
+  const bio =
+    get(
+      "bio",
+      "about",
+      "intro"
+    );
+
+  const location =
+    get(
+      "location",
+      "currentLocation"
+    );
+
+  const hometown =
+    get(
+      "hometown"
+    );
+
+  const work =
+    get(
+      "work",
+      "employment",
+      "company"
+    );
+
+  const education =
+    get(
+      "education",
+      "school",
+      "college",
+      "university"
+    );
+
+  const birthday =
+    get(
+      "birthday",
+      "birthDate"
+    );
+
+  const gender =
+    get(
+      "gender"
+    );
+
+  const verified =
+    get(
+      "verified",
+      "isVerified"
+    );
+
+  const website =
+    get(
+      "website",
+      "websites"
+    );
+
+  const relationship =
+    get(
+      "relationshipStatus",
+      "relationship"
+    );
+
+  // ==========================================
+  // OUTPUT
+  // ==========================================
+
+  const message = `
+╭━━━━━━━━━━━━━━━━━━━━━━╮
+┃   🔎 FACEBOOK UID3
+╰━━━━━━━━━━━━━━━━━━━━━━╯
+
+👤 BASIC INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━
+📛 Name       : ${name}
+🆔 UID        : ${uid}
+👤 First Name : ${firstName}
+🔤 Username   : ${vanity}
+🔗 Profile    : ${profileUrl}
+
+📊 FACEBOOK ACTIVITY
+━━━━━━━━━━━━━━━━━━━━━━
+📝 Posts      : ${posts}
+🎬 Reels      : ${reels}
+🎥 Videos     : ${videos}
+📸 Photos     : ${photos}
+
+👥 SOCIAL INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━
+👥 Friends    : ${friends}
+👤 Followers  : ${followers}
+➕ Following   : ${following}
+
+📖 PUBLIC INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━
+📝 Bio        : ${bio}
+🌍 Location   : ${location}
+🏠 Hometown   : ${hometown}
+
+💼 WORK
+━━━━━━━━━━━━━━━━━━━━━━
+🏢 Work       : ${work}
+
+🎓 EDUCATION
+━━━━━━━━━━━━━━━━━━━━━━
+🏫 Education  : ${education}
+
+ℹ️ OTHER
+━━━━━━━━━━━━━━━━━━━━━━
+🎂 Birthday   : ${birthday}
+⚧️ Gender     : ${gender}
+❤️ Relationship : ${relationship}
+🌐 Website    : ${website}
+🔵 Verified   : ${verified}
+
+━━━━━━━━━━━━━━━━━━━━━━
+⚠️ শুধু API/Messenger থেকে
+বৈধভাবে পাওয়া তথ্য দেখানো হয়েছে।
+━━━━━━━━━━━━━━━━━━━━━━
+`;
+
+  return api.sendMessage(
+    message,
+    event.threadID,
+    event.messageID
+  );
 };
