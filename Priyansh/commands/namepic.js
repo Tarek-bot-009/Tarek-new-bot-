@@ -1,6 +1,6 @@
 const fs = require("fs-extra");
 const path = require("path");
-const axios = global.nodemodule["axios"];
+const axios = global.nodemodule["axios"] || require("axios");
 
 // ============================================================
 // নাম, imgur লিংক আর ক্যাপশন
@@ -8,15 +8,15 @@ const axios = global.nodemodule["axios"];
 const PICS = {
   "ইকবাল": {
     url: "https://i.imgur.com/qJWGNBm.jpeg",
-    caption: "সারাদিন ঘুমাই রাত হলে গরু চুরি করে ইকবাল "
+    caption: "ইকবাল আসছে, গ্রুপের মুড এখন অন 😎"
   },
   "জাহেদ": {
     url: "https://i.imgur.com/nepKsF4.jpeg",
-    caption: "এইটা হলো পরোটা জাহেদ 🔥"
+    caption: "জাহেদ ভাই আসলেই গ্রুপ জমে যায় 🔥"
   },
   "ঈশান": {
     url: "https://i.imgur.com/UkaUnhl.jpeg",
-    caption: "এইটা হলো ঈশান সবাই ওরে ইচা মাছ নামে চিনে"
+    caption: "ঈশান নাম শুনলেই মনে হয় কিছু একটা ইমপ্রেসিভ হবে 😏"
   },
   "মায়া": {
     url: "https://i.imgur.com/sS1Mf0B.jpeg",
@@ -24,15 +24,15 @@ const PICS = {
   },
   "নাসিম": {
     url: "https://i.imgur.com/Fr4xhea.jpeg",
-    caption: "নতুন মেয়ে আসলে সে ওয়াইফাই কানেক্ট করতে চাই"
+    caption: "নাসিম এসেছে, এবার আর কেউ পালাতে পারবে না 😂"
   },
   "আনোয়ার": {
     url: "https://i.imgur.com/Ebs8zdV.jpeg",
-    caption: "মরা মুরগ সারাদিন চিপায় থাকে "
+    caption: "আনোয়ার ভাই, গ্রুপের বড় ভাই, সম্মান দিয়ে দেখুন 🫡"
   },
   "শিফা": {
     url: "https://i.imgur.com/Y8tkjtN.jpeg",
-    caption: "চকলেট এর হাসি বড্ড ভালুবাসি 💅"
+    caption: "শিফা আসছে, লাইক দিতে ভুলবেন না 💅"
   },
   "মুন্না": {
     url: "https://i.imgur.com/Sge3XXH.jpeg",
@@ -40,7 +40,7 @@ const PICS = {
   },
   "হালফান": {
     url: "https://i.imgur.com/xU7Z5pL.jpeg",
-    caption: "এইটা সারাদিন মেয়েদের মধু খাই হালা লুচ্চা"
+    caption: "হালফান স্টেজে, সবাই তালি দিন 👏"
   },
 };
 // ============================================================
@@ -49,7 +49,7 @@ const CACHE_DIR = path.join(__dirname, "cache");
 
 module.exports.config = {
   name: "namepic",
-  version: "1.2.0",
+  version: "1.3.0",
   hasPermssion: 0,
   credits: "you",
   description: "নাম বললে সেই ব্যক্তির ছবি ও ক্যাপশন পাঠাবে",
@@ -65,7 +65,18 @@ module.exports.config = {
 async function downloadPic(url) {
   await fs.ensureDir(CACHE_DIR);
   const filePath = path.join(CACHE_DIR, `namepic_${Date.now()}.jpg`);
-  const res = await axios.get(url, { responseType: "arraybuffer" });
+  const res = await axios.get(url, {
+    responseType: "arraybuffer",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      "Accept": "image/*"
+    },
+    timeout: 15000
+  });
+  const type = String(res.headers["content-type"] || "");
+  if (!type.startsWith("image/")) {
+    throw new Error("লিংক ছবি নয়, content-type: " + type);
+  }
   await fs.writeFile(filePath, Buffer.from(res.data));
   return filePath;
 }
@@ -92,9 +103,9 @@ module.exports.handleEvent = async function ({ api, event }) {
       event.messageID
     );
   } catch (err) {
-    console.error("NAMEPIC ERROR:", err);
+    console.error("NAMEPIC ERROR [" + matchedName + "]:", err.message);
     return api.sendMessage(
-      `❌ "${matchedName}" এর ছবি আনা যায়নি। লিংকটি সঠিক কিনা দেখুন।`,
+      `❌ "${matchedName}" এর ছবি আনা যায়নি।`,
       event.threadID,
       event.messageID
     );
