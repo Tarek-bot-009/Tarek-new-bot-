@@ -1,77 +1,78 @@
-//learn to eat, learn to speak, don't learn the habit of replacing cre 
+const fs = require("fs-extra");
+const path = require("path");
+const axios = require("axios");
+const { loadImage, createCanvas } = require("canvas");
+
+const TEMPLATE_URL = "https://i.imgur.com/GXPQYtT.png";
+const MAX_WIDTH = 470;
+const X = 580, Y = 646, LINE_HEIGHT = 36;
+
 module.exports.config = {
-
-	name: "googlebar",
-
-	version: "1.0.0",
-	hasPermssion: 0,
-	credits: "𝐏𝐫𝐢𝐲𝐚𝐧𝐬𝐡 𝐑𝐚𝐣𝐩𝐮𝐭",
-	description: "Comment on table ( ͡° ͜ʖ ͡°)",
-	commandCategory: "edit-img",
-	usages: "google [text]",
-	cooldowns: 10,
-	dependencies: {
-		"canvas":"",
-		 "axios":"",
-		 "fs-extra":""
-	}
+  name: "googlebar",
+  version: "2.0.0",
+  hasPermssion: 0,
+  credits: "Priyansh Rajput (fixed)",
+  description: "Google সার্চ বক্সের ছবিতে লেখা বসিয়ে দেয়",
+  commandCategory: "edit-img",
+  usages: "googlebar [লেখা]",
+  cooldowns: 10,
+  dependencies: { "canvas": "", "axios": "", "fs-extra": "" }
 };
 
+// লম্বা লেখা কয়েক লাইনে ভাঙে
 module.exports.wrapText = (ctx, text, maxWidth) => {
-	return new Promise(resolve => {
-		if (ctx.measureText(text).width < maxWidth) return resolve([text]);
-		if (ctx.measureText('W').width > maxWidth) return resolve(null);
-		const words = text.split(' ');
-		const lines = [];
-		let line = '';
-		while (words.length > 0) {
-			let split = false;
-			while (ctx.measureText(words[0]).width >= maxWidth) {
-				const temp = words[0];
-				words[0] = temp.slice(0, -1);
-				if (split) words[1] = `${temp.slice(-1)}${words[1]}`;
-				else {
-					split = true;
-					words.splice(1, 0, temp.slice(-1));
-				}
-			}
-			if (ctx.measureText(`${line}${words[0]}`).width < maxWidth) line += `${words.shift()} `;
-			else {
-				lines.push(line.trim());
-				line = '';
-			}
-			if (words.length === 0) lines.push(line.trim());
-		}
-		return resolve(lines);
-	});
-} 
+  const words = String(text).split(" ");
+  const lines = [];
+  let line = "";
+  for (const w of words) {
+    const test = line ? `${line} ${w}` : w;
+    if (ctx.measureText(test).width <= maxWidth || !line) line = test;
+    else { lines.push(line); line = w; }
+  }
+  if (line) lines.push(line);
+  return lines;
+};
 
-module.exports.run = async function({ api, event, args }) {
-	let { senderID, threadID, messageID } = event;
-	const { loadImage, createCanvas } = require("canvas");
-	const fs = global.nodemodule["fs-extra"];
-	const axios = global.nodemodule["axios"];
-	let pathImg = __dirname + '/cache/google.png';
-	var text = args.join(" ");
-	if (!text) return api.sendMessage("Enter the content of the comment on the board", threadID, messageID);
-	let getPorn = (await axios.get(`https://i.imgur.com/GXPQYtT.png`, { responseType: 'arraybuffer' })).data;
-	fs.writeFileSync(pathImg, Buffer.from(getPorn, 'utf-8'));
-	let baseImage = await loadImage(pathImg);
-	let canvas = createCanvas(baseImage.width, baseImage.height);
-	let ctx = canvas.getContext("2d");
-	ctx.drawImage(baseImage, 0, 0, canvas.width, canvas.height);
-	ctx.font = "400 30px Arial";
-	ctx.fillStyle = "#000000";
-	ctx.textAlign = "start";
-	let fontSize = 50;
-	while (ctx.measureText(text).width > 1200) {
-		fontSize--;
-		ctx.font = `400 ${fontSize}px Arial`;
-	}
-	const lines = await this.wrapText(ctx, text, 470);
-	ctx.fillText(lines.join('\n'), 580,646);//comment
-	ctx.beginPath();
-	const imageBuffer = canvas.toBuffer();
-	fs.writeFileSync(pathImg, imageBuffer);
-return api.sendMessage({ attachment: fs.createReadStream(pathImg) }, threadID, () => fs.unlinkSync(pathImg), messageID);        
-}
+module.exports.run = async function ({ api, event, args }) {
+  const { threadID, messageID } = event;
+  const text = (args || []).join(" ").trim();
+  if (!text) return api.sendMessage("✏️ বোর্ডে কী লিখবে তা দাও।\nউদাহরণ: googlebar তোমার লেখা", threadID, messageID);
+
+  const cacheDir = path.join(__dirname, "cache");
+  const outPath = path.join(cacheDir, `googlebar_${Date.now()}.png`);
+  const cleanup = () => { try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch (e) {} };
+
+  try {
+    fs.ensureDirSync(cacheDir);
+    const res = await axios.get(TEMPLATE_URL, { responseType: "arraybuffer", timeout: 20000 });
+    const base = await loadImage(Buffer.from(res.data));
+
+    const canvas = createCanvas(base.width, base.height);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(base, 0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#000000";
+    ctx.textAlign = "start";
+
+    let fontSize = 30;
+    ctx.font = `400 ${fontSize}px Arial`;
+    while (ctx.measureText(text).width > 1200 && fontSize > 12) {
+      fontSize--;
+      ctx.font = `400 ${fontSize}px Arial`;
+    }
+
+    const lines = module.exports.wrapText(ctx, text, MAX_WIDTH) || [text];
+    lines.forEach((line, i) => ctx.fillText(line, X, Y + i * LINE_HEIGHT));
+
+    fs.writeFileSync(outPath, canvas.toBuffer("image/png"));
+    return api.sendMessage(
+      { attachment: fs.createReadStream(outPath) },
+      threadID,
+      () => cleanup(),
+      messageID
+    );
+  } catch (e) {
+    cleanup();
+    console.log("[googlebar error]", e && e.message || e);
+    return api.sendMessage("❌ ছবি বানাতে পারলাম না। একটু পরে আবার চেষ্টা করো।", threadID, messageID);
+  }
+};
