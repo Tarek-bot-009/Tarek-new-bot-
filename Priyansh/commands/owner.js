@@ -1,68 +1,50 @@
 const axios = require("axios");
-const fs = require("fs");
-const request = require("request");
- 
-const link = [
-  "https://i.imgur.com/YCXF6To.mp4",,
- 
-];
- 
+const fs = require("fs-extra");
+const path = require("path");
+
+const VIDEOS = ["https://i.imgur.com/YCXF6To.mp4"];
+const TEXT = "Boss Tarek ai video ❤️❤️🥰";
+const MAX_BYTES = 25 * 1024 * 1024;
+
 module.exports.config = {
   name: "noprefix13",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 0,
-  credits: "nazrul",
-  description: "",
-  commandCategory: "no prefix", 
-  usages: "🥵",
+  credits: "nazrul (fixed)",
+  description: "\"owner\" দিয়ে শুরু হলে একটা ভিডিও পাঠায়",
+  commandCategory: "no prefix",
+  usages: "owner",
   cooldowns: 5,
-  dependencies: {
-    "request": "",
-    "fs-extra": "",
-    "axios": ""
+  dependencies: { "axios": "", "fs-extra": "" }
+};
+
+module.exports.handleEvent = async function ({ api, event }) {
+  const body = String(event.body || "").trim().toLowerCase();
+  if (!body.startsWith("owner")) return;
+
+  const url = VIDEOS[Math.floor(Math.random() * VIDEOS.length)];
+  const outPath = path.join(__dirname, "cache", `owner_${Date.now()}.mp4`);
+  const cleanup = () => { try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch (e) {} };
+
+  try {
+    const res = await axios.get(url, { responseType: "arraybuffer", timeout: 60000, maxContentLength: MAX_BYTES, headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!res.data || res.data.length < 5000) throw new Error("ভিডিও খালি বা ছোট");
+    fs.ensureDirSync(path.join(__dirname, "cache"));
+    fs.writeFileSync(outPath, Buffer.from(res.data));
+    return api.sendMessage(
+      { body: TEXT, attachment: fs.createReadStream(outPath) },
+      event.threadID,
+      () => cleanup(),
+      event.messageID
+    );
+  } catch (e) {
+    cleanup();
+    console.log("[owner video] পাঠানো যায়নি:", e && e.message || e);
+    return api.sendMessage(TEXT + "\n(ভিডিওটা এখন আনা যায়নি)", event.threadID, event.messageID);
   }
 };
- 
-module.exports.handleEvent = async ({ api, event, Threads }) => {
-  const content = event.body ? event.body : '';
-    const body = content.toLowerCase();
-  if (body.startsWith("owner")) {
-    const rahad = [
-      "Boss Tarek ai video❤️❤️🥰"
-    
-    ];
-    const rahad2 = rahad[Math.floor(Math.random() * rahad.length)];
- 
-    const callback = () => api.sendMessage({
-      body: `${rahad2}`,
-      attachment: fs.createReadStream(__dirname + "/cache/2025.mp4")
-    }, event.threadID, () => fs.unlinkSync(__dirname + "/cache/2025.mp4"), event.messageID);
-    
-    const requestStream = request(encodeURI(link[Math.floor(Math.random() * link.length)]));
-    requestStream.pipe(fs.createWriteStream(__dirname + "/cache/2025.mp4")).on("close", () => callback());
-    return requestStream;
-  }
+
+module.exports.run = async function ({ api, event }) {
+  return api.sendMessage("এই কমান্ড নিজে থেকে কাজ করে। 'owner' দিয়ে মেসেজ শুরু করো।", event.threadID, event.messageID);
 };
  
-module.exports.languages = {
-  "vi": {
-    "on": "Dùng sai cách rồi lêu lêu",
-    "off": "sv ngu, đã bão dùng sai cách",
-    "successText": `🧠`,
-  },
-  "en": {
-    "on": "on",
-    "off": "off",
-    "successText": "success!",
-  }
-};
- 
-module.exports.run = async ({ api, event, Threads, getText }) => {
-  const { threadID, messageID } = event;
-  let data = (await Threads.getData(threadID)).data;
-  if (typeof data["🥵"] === "undefined" || data["🥵"]) data["🥵"] = false;
-  else data["🥵"] = true;
-  await Threads.setData(threadID, { data });
-  global.data.threadData.set(threadID, data);
-  api.sendMessage(`${(data["🥵"]) ? getText("off") : getText("on")} ${getText("successText")}`, threadID, messageID);
-};
