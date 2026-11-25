@@ -36,7 +36,7 @@ module.exports.handleEvent = async function ({ event, api, Users }) {
         const userName = (await Users.getNameUser(senderID)) || "কেউ";
 
         if (!msg.attachment || msg.attachment.length === 0) {
-            return api.sendMessage(`সবাই দেখেন নাও\n${userName} রিমুভ করেছে:\n${msg.msgBody || ""}`, threadID);
+            return api.sendMessage(`সবাই দেখে নাও\n${userName} রিমুভ করেছে:\n${msg.msgBody || ""}`, threadID);
         }
 
         const dir = path.join(__dirname, "cache");
